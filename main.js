@@ -59,6 +59,7 @@ function updateNav(loggedIn, name) {
     if (sellBtn) { sellBtn.textContent = '+ Sæt til salg'; sellBtn.setAttribute('onclick', 'openModal()'); }
     if (navProfile) navProfile.style.display = 'flex';
     updateNavAvatar(name);
+    checkUnreadMessages();
   } else {
     if (sellBtn) { sellBtn.textContent = 'Log ind / Sælg'; sellBtn.setAttribute('onclick', 'openLoginModal()'); }
     if (navProfile) navProfile.style.display = 'none';
@@ -68,6 +69,20 @@ function updateNav(loggedIn, name) {
 function updateNavAvatar(name) {
   const el = document.getElementById('nav-initials');
   if (el) el.textContent = (name || '?').substring(0, 2).toUpperCase();
+}
+
+async function checkUnreadMessages() {
+  if (!currentUser) return;
+  const { count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('receiver_id', currentUser.id)
+    .eq('read', false);
+  const badge = document.getElementById('inbox-badge');
+  if (badge && count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'inline';
+  }
 }
 
 /* ============================================================
@@ -118,7 +133,7 @@ function renderBikes(bikes) {
       : '<span style="font-size:4rem">🚲</span>';
 
     return `
-      <div class="bike-card" style="animation-delay:${i * 50}ms">
+      <div class="bike-card" style="animation-delay:${i * 50}ms" onclick="openBikeModal('${b.id}')">
         <div class="bike-card-img">
           ${imgContent}
           <span class="condition-tag">${b.condition}</span>
@@ -395,12 +410,13 @@ function showProfileData() {
 }
 
 function switchProfileTab(tab) {
-  ['info', 'listings', 'saved'].forEach(t => {
+  ['info', 'listings', 'saved', 'inbox'].forEach(t => {
     document.getElementById(`profile-${t}`).style.display = t === tab ? 'block' : 'none';
     document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
   });
   if (tab === 'listings') loadMyListings();
   if (tab === 'saved')    loadSavedListings();
+  if (tab === 'inbox')    loadInbox();
 }
 
 async function saveProfile() {
@@ -513,6 +529,325 @@ function showSection(section) {
   else document.querySelector('.main').scrollIntoView({ behavior: 'smooth' });
 }
 
+
+/* ============================================================
+   ANNONCE DETALJE MODAL
+   ============================================================ */
+
+async function openBikeModal(bikeId) {
+  document.getElementById('bike-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
+
+  const { data: b, error } = await supabase
+    .from('bikes')
+    .select('*, profiles(id, name, seller_type, shop_name, phone, city), bike_images(url, is_primary)')
+    .eq('id', bikeId)
+    .single();
+
+  if (error || !b) {
+    document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--rust)">Kunne ikke hente annonce.</p>';
+    return;
+  }
+
+  const profile    = b.profiles || {};
+  const sellerType = profile.seller_type || 'private';
+  const sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
+  const initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
+  const primaryImg = b.bike_images?.find(img => img.is_primary)?.url;
+  const imgContent = primaryImg
+    ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}">`
+    : '<span>🚲</span>';
+
+  const isOwner = currentUser && currentUser.id === profile.id;
+
+  document.getElementById('bike-modal-title').textContent = `${b.brand} ${b.model}`;
+
+  document.getElementById('bike-modal-body').innerHTML = `
+    <div class="bike-detail-grid">
+      <div>
+        <div class="bike-detail-img">${imgContent}</div>
+      </div>
+      <div class="bike-detail-info">
+        <div class="bike-detail-price">${b.price.toLocaleString('da-DK')} kr.</div>
+        <div class="bike-detail-tags">
+          <span class="detail-tag">${b.type}</span>
+          ${b.year ? `<span class="detail-tag">${b.year}</span>` : ''}
+          ${b.size ? `<span class="detail-tag">Str. ${b.size}</span>` : ''}
+          ${b.condition ? `<span class="detail-tag">${b.condition}</span>` : ''}
+          ${b.city ? `<span class="detail-tag">📍 ${b.city}</span>` : ''}
+        </div>
+        <div class="bike-detail-seller">
+          <div class="seller-avatar-large">${initials}</div>
+          <div>
+            <div class="seller-detail-name">${sellerName || 'Ukendt'}</div>
+            <div class="seller-detail-city">${profile.city || ''}</div>
+            <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
+              ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
+            </span>
+          </div>
+        </div>
+        ${!isOwner ? `
+        <div class="action-buttons">
+          <button class="btn-bid" onclick="toggleBidBox()">💰 Giv et bud</button>
+          <div class="bid-box" id="bid-box">
+            <div class="bid-box-inner">
+              <input type="number" id="bid-amount" placeholder="Dit bud i kr.">
+              <button onclick="sendBid('${b.id}', '${profile.id}')">Send bud</button>
+            </div>
+          </div>
+          <button class="btn-contact" onclick="toggleMessageBox()">✉️ Kontakt sælger</button>
+          <div class="message-box" id="message-box">
+            <textarea id="message-text" placeholder="Skriv en besked til sælgeren..."></textarea>
+            <button onclick="sendMessage('${b.id}', '${profile.id}')">Send besked</button>
+          </div>
+          <button class="btn-save-listing" onclick="toggleSaveFromModal(this, '${b.id}')">🤍 Gem annonce</button>
+        </div>
+        ` : `<p style="color:var(--muted);font-size:.85rem">Dette er din egen annonce.</p>`}
+      </div>
+    </div>
+    ${b.description ? `
+    <div style="margin-top:20px;">
+      <h3 style="font-family:'Fraunces',serif;font-size:1rem;margin-bottom:10px;">Beskrivelse</h3>
+      <div class="bike-detail-description">${b.description}</div>
+    </div>` : ''}
+  `;
+}
+
+function closeBikeModal() {
+  document.getElementById('bike-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('bike-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeBikeModal();
+});
+
+function toggleBidBox() {
+  const box = document.getElementById('bid-box');
+  const msgBox = document.getElementById('message-box');
+  if (msgBox) msgBox.style.display = 'none';
+  box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  if (box.style.display === 'block') document.getElementById('bid-amount').focus();
+}
+
+function toggleMessageBox() {
+  const box = document.getElementById('message-box');
+  const bidBox = document.getElementById('bid-box');
+  if (bidBox) bidBox.style.display = 'none';
+  box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  if (box.style.display === 'block') document.getElementById('message-text').focus();
+}
+
+async function sendMessage(bikeId, receiverId) {
+  if (!currentUser) { showToast('⚠️ Log ind for at sende beskeder'); return; }
+  const content = document.getElementById('message-text').value.trim();
+  if (!content) { showToast('⚠️ Skriv en besked først'); return; }
+
+  const { error } = await supabase.from('messages').insert({
+    bike_id:     bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: receiverId,
+    content,
+  });
+
+  if (error) { showToast('❌ Kunne ikke sende besked'); console.error(error); return; }
+  document.getElementById('message-text').value = '';
+  document.getElementById('message-box').style.display = 'none';
+  showToast('✅ Besked sendt!');
+}
+
+async function sendBid(bikeId, receiverId) {
+  if (!currentUser) { showToast('⚠️ Log ind for at give bud'); return; }
+  const amount = document.getElementById('bid-amount').value;
+  if (!amount) { showToast('⚠️ Indtast et bud'); return; }
+
+  const content = `💰 Bud: ${parseInt(amount).toLocaleString('da-DK')} kr.`;
+
+  const { error } = await supabase.from('messages').insert({
+    bike_id:     bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: receiverId,
+    content,
+  });
+
+  if (error) { showToast('❌ Kunne ikke sende bud'); return; }
+  document.getElementById('bid-amount').value = '';
+  document.getElementById('bid-box').style.display = 'none';
+  showToast('✅ Bud sendt til sælgeren!');
+}
+
+async function toggleSaveFromModal(btn, bikeId) {
+  if (!currentUser) { showToast('⚠️ Log ind for at gemme'); return; }
+  const isSaved = btn.textContent.includes('❤️');
+  if (isSaved) {
+    await supabase.from('saved_bikes').delete().eq('user_id', currentUser.id).eq('bike_id', bikeId);
+    btn.textContent = '🤍 Gem annonce';
+  } else {
+    await supabase.from('saved_bikes').insert({ user_id: currentUser.id, bike_id: bikeId });
+    btn.textContent = '❤️ Gemt';
+  }
+}
+
+
+/* ============================================================
+   INDBAKKE
+   ============================================================ */
+
+let activeThread = null; // { bikeId, otherUserId, otherName }
+
+async function loadInbox() {
+  if (!currentUser) return;
+  const list = document.getElementById('inbox-list');
+  list.innerHTML = '<p style="color:var(--muted)">Henter beskeder...</p>';
+
+  // Hent alle beskeder hvor brugeren er afsender eller modtager
+  const { data, error } = await supabase
+    .from('messages')
+    .select(`
+      *,
+      bikes(brand, model),
+      sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type),
+      receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)
+    `)
+    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Inbox fejl:', error);
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Du har ingen beskeder endnu.</p>';
+    return;
+  }
+
+  // Grupper beskeder i tråde per (bike_id + anden bruger)
+  const threads = {};
+  data.forEach(msg => {
+    const otherId   = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+    const otherProf = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
+    const key       = `${msg.bike_id}_${otherId}`;
+    if (!threads[key]) {
+      threads[key] = {
+        bikeId:      msg.bike_id,
+        bike:        msg.bikes,
+        otherId,
+        otherName:   otherProf?.seller_type === 'dealer' ? otherProf?.shop_name : otherProf?.name,
+        messages:    [],
+        hasUnread:   false,
+      };
+    }
+    threads[key].messages.push(msg);
+    if (!msg.read && msg.receiver_id === currentUser.id) threads[key].hasUnread = true;
+  });
+
+  const threadList = Object.values(threads);
+  const unreadCount = threadList.filter(t => t.hasUnread).length;
+
+  // Opdater badge
+  const badge = document.getElementById('inbox-badge');
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  list.innerHTML = threadList.map(t => {
+    const lastMsg   = t.messages[0];
+    const initials  = (t.otherName || 'U').substring(0, 2).toUpperCase();
+    const preview   = lastMsg.content.length > 50 ? lastMsg.content.substring(0, 50) + '...' : lastMsg.content;
+    const time      = new Date(lastMsg.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short' });
+    const bikeName  = t.bike ? `${t.bike.brand} ${t.bike.model}` : 'Ukendt cykel';
+
+    return `
+      <div class="inbox-row ${t.hasUnread ? 'unread' : ''}"
+           onclick="openThread('${t.bikeId}', '${t.otherId}', '${(t.otherName||'Ukendt').replace(/'/g,'')}')">
+        <div class="inbox-avatar">${initials}</div>
+        <div class="inbox-content">
+          <div class="inbox-from">${t.otherName || 'Ukendt'}</div>
+          <div class="inbox-bike">Re: ${bikeName}</div>
+          <div class="inbox-preview">${preview}</div>
+        </div>
+        <div class="inbox-time">${time}</div>
+      </div>`;
+  }).join('');
+}
+
+async function openThread(bikeId, otherId, otherName) {
+  activeThread = { bikeId, otherId, otherName };
+
+  document.getElementById('inbox-list').style.display     = 'none';
+  document.getElementById('message-thread').style.display = 'block';
+
+  // Sæt tråd-header
+  document.getElementById('thread-header').innerHTML =
+    `<strong>${otherName}</strong> — <span style="color:var(--muted)">besked om annonce</span>`;
+
+  // Hent alle beskeder i denne tråd
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('bike_id', bikeId)
+    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${currentUser.id})`)
+    .order('created_at', { ascending: true });
+
+  const threadEl = document.getElementById('thread-messages');
+  if (error || !data) {
+    threadEl.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>';
+    return;
+  }
+
+  threadEl.innerHTML = data.map(msg => {
+    const isSent = msg.sender_id === currentUser.id;
+    const time   = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    return `
+      <div class="message-bubble ${isSent ? 'sent' : 'received'}">
+        ${msg.content}
+        <div class="msg-time">${time}</div>
+      </div>`;
+  }).join('');
+
+  // Scroll til bunden
+  threadEl.scrollTop = threadEl.scrollHeight;
+
+  // Marker ulæste som læst
+  await supabase.from('messages')
+    .update({ read: true })
+    .eq('bike_id', bikeId)
+    .eq('sender_id', otherId)
+    .eq('receiver_id', currentUser.id);
+}
+
+function closeThread() {
+  activeThread = null;
+  document.getElementById('inbox-list').style.display     = 'flex';
+  document.getElementById('inbox-list').style.flexDirection = 'column';
+  document.getElementById('message-thread').style.display = 'none';
+  document.getElementById('reply-text').value = '';
+  loadInbox();
+}
+
+async function sendReply() {
+  if (!activeThread || !currentUser) return;
+  const content = document.getElementById('reply-text').value.trim();
+  if (!content) { showToast('⚠️ Skriv et svar først'); return; }
+
+  const { error } = await supabase.from('messages').insert({
+    bike_id:     activeThread.bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: activeThread.otherId,
+    content,
+  });
+
+  if (error) { showToast('❌ Kunne ikke sende svar'); return; }
+  document.getElementById('reply-text').value = '';
+  showToast('✅ Svar sendt!');
+  openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -537,6 +872,17 @@ window.showSection       = showSection;
 window.logout            = logout;
 window.searchBikes       = searchBikes;
 window.sortBikes         = sortBikes;
+window.openBikeModal      = openBikeModal;
+window.closeBikeModal     = closeBikeModal;
+window.toggleBidBox       = toggleBidBox;
+window.toggleMessageBox   = toggleMessageBox;
+window.sendMessage        = sendMessage;
+window.sendBid            = sendBid;
+window.toggleSaveFromModal= toggleSaveFromModal;
+window.loadInbox          = loadInbox;
+window.openThread         = openThread;
+window.closeThread        = closeThread;
+window.sendReply          = sendReply;
 
 /* ============================================================
    START
