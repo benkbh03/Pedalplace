@@ -2,10 +2,6 @@
    CYKELBØRSEN – main.js (med Supabase)
    ============================================================ */
 
-/* ── SUPABASE KONFIGURATION ─────────────────────────────────
-   Find disse værdier i Supabase:
-   Project Settings → API → Project URL + anon/public key
-   ──────────────────────────────────────────────────────── */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
 const SUPABASE_URL = 'https://ktufgncydxhkhfttojkh.supabase.co';
@@ -13,21 +9,14 @@ const SUPABASE_KEY = 'sb_publishable_bxJ_gRDrsJ-XCWWUD6NiQA_1nlPDA2B';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ── HENT OG VIS ANNONCER ───────────────────────────────────
-   Henter alle aktive cykler fra databasen inkl. sælgerens
-   profilinfo og det primære billede.
-   ──────────────────────────────────────────────────────── */
+/* ── HENT OG VIS ANNONCER ───────────────────────────────────*/
 async function loadBikes(filters = {}) {
   const grid = document.getElementById('listings-grid');
   grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
 
   let query = supabase
     .from('bikes')
-    .select(`
-      *,
-      profiles (name, seller_type, shop_name),
-      bike_images (url, is_primary)
-    `)
+    .select(`*, profiles (name, seller_type, shop_name), bike_images (url, is_primary)`)
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
@@ -46,9 +35,7 @@ async function loadBikes(filters = {}) {
   renderBikes(data);
 }
 
-/* ── RENDER ANNONCEKORT ─────────────────────────────────────
-   Bygger HTML-kort for hvert cykelobjekt fra databasen.
-   ──────────────────────────────────────────────────────── */
+/* ── RENDER ANNONCEKORT ─────────────────────────────────────*/
 function renderBikes(bikes) {
   const grid = document.getElementById('listings-grid');
 
@@ -72,11 +59,8 @@ function renderBikes(bikes) {
         <div class="bike-card-img">
           ${imgContent}
           <span class="condition-tag">${b.condition}</span>
-          <button
-            class="save-btn"
-            aria-label="Gem annonce"
-            onclick="event.stopPropagation(); toggleSave(this, '${b.id}')"
-          >🤍</button>
+          <button class="save-btn" aria-label="Gem annonce"
+            onclick="event.stopPropagation(); toggleSave(this, '${b.id}')">🤍</button>
         </div>
         <div class="bike-card-body">
           <div class="card-top">
@@ -106,18 +90,14 @@ function renderBikes(bikes) {
   }).join('');
 }
 
-/* ── GEM / FJERN ANNONCE ────────────────────────────────────
-   Gemmer eller fjerner en annonce for den indloggede bruger.
-   ──────────────────────────────────────────────────────── */
+/* ── GEM / FJERN ANNONCE ────────────────────────────────────*/
 async function toggleSave(btn, bikeId) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     showToast('⚠️ Log ind for at gemme annoncer');
     return;
   }
-
   const isSaved = btn.textContent === '❤️';
-
   if (isSaved) {
     await supabase.from('saved_bikes').delete()
       .eq('user_id', user.id).eq('bike_id', bikeId);
@@ -132,7 +112,6 @@ async function toggleSave(btn, bikeId) {
 function togglePill(el) {
   document.querySelectorAll('.pill').forEach((p) => p.classList.remove('active'));
   el.classList.add('active');
-
   const text = el.textContent.trim();
   if      (text === 'Alle')             loadBikes();
   else if (text === 'El-cykler')        loadBikes({ type: 'El-cykel' });
@@ -162,9 +141,7 @@ function selectType(type) {
   document.getElementById('dealer-fields').style.display = isDealer ? 'block' : 'none';
 }
 
-/* ── INDSEND ANNONCE ────────────────────────────────────────
-   Samler formulardata og gemmer til Supabase.
-   ──────────────────────────────────────────────────────── */
+/* ── INDSEND ANNONCE ────────────────────────────────────────*/
 async function submitListing() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -192,7 +169,6 @@ async function submitListing() {
   }
 
   const { error } = await supabase.from('bikes').insert(bikeData);
-
   if (error) {
     showToast('❌ Noget gik galt – prøv igen');
     console.error(error);
@@ -204,9 +180,7 @@ async function submitListing() {
   loadBikes();
 }
 
-/* ── BRUGER LOGIN / REGISTRERING / LOGOUT ───────────────────
-   Kaldes fra en login-modal du kan tilføje til index.html.
-   ──────────────────────────────────────────────────────── */
+/* ── LOGIN / REGISTRERING / LOGOUT ─────────────────────────*/
 async function login(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) showToast('❌ Forkert email eller adgangskode');
@@ -215,9 +189,7 @@ async function login(email, password) {
 
 async function register(email, password, name) {
   const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name } },
+    email, password, options: { data: { name } },
   });
   if (error) showToast('❌ Kunne ikke oprette bruger: ' + error.message);
   else       showToast('✅ Tjek din email for at bekræfte kontoen');
@@ -228,7 +200,6 @@ async function logout() {
   showToast('👋 Du er logget ud');
 }
 
-/* Opdater UI når login-status ændrer sig */
 supabase.auth.onAuthStateChange((_event, session) => {
   const sellBtn = document.querySelector('.btn-sell');
   if (sellBtn) {
@@ -252,6 +223,20 @@ function showSection(section) {
     document.querySelector('.main').scrollIntoView({ behavior: 'smooth' });
   }
 }
+
+/* ── GØR FUNKTIONER GLOBALE ─────────────────────────────────
+   Nødvendigt når type="module" bruges, så onclick="" i HTML virker
+   ──────────────────────────────────────────────────────── */
+window.openModal     = openModal;
+window.closeModal    = closeModal;
+window.selectType    = selectType;
+window.togglePill    = togglePill;
+window.toggleSave    = toggleSave;
+window.submitListing = submitListing;
+window.showSection   = showSection;
+window.login         = login;
+window.register      = register;
+window.logout        = logout;
 
 /* ── INIT ───────────────────────────────────────────────────*/
 loadBikes();
