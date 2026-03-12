@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cykelbørsen – Køb & Sælg Brugte Cykler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── NAVIGATION ── -->
+  <nav>
+    <div class="logo">Cykel<span>børsen</span></div>
+    <div class="nav-links">
+      <a onclick="showSection('listings')">Annoncer</a>
+      <a onclick="showSection('dealers')">Forhandlere</a>
+      <a>Om os</a>
+      <a class="btn-sell" onclick="openModal()">+ Sæt til salg</a>
+    </div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Find din<br>næste<br><em>to-hjuler</em></h1>
+      <p>Danmarks største marked for brugte cykler — fra private sælgere og autoriserede forhandlere. God cykel til fair pris.</p>
+      <div class="hero-btns">
+        <button class="btn-primary" onclick="document.querySelector('.search-section').scrollIntoView({behavior:'smooth'})">Udforsk cykler</button>
+        <button class="btn-outline" onclick="openModal()">Sælg din cykel</button>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-icon">🚲</div>
+        <div>
+          <div class="stat-number">4.800+</div>
+          <div class="stat-label">Aktive annoncer</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏪</div>
+        <div>
+          <div class="stat-number">140</div>
+          <div class="stat-label">Autoriserede forhandlere</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div>
+          <div class="stat-number">12.000+</div>
+          <div class="stat-label">Gennemførte handler</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SØGEBAR ── -->
+  <div class="search-section">
+    <div class="search-bar">
+      <input type="text" placeholder="Søg efter mærke, model, type...">
+      <select>
+        <option>Alle typer</option>
+        <option>Racercykel</option>
+        <option>Mountainbike</option>
+        <option>Citybike</option>
+        <option>El-cykel</option>
+        <option>Ladcykel</option>
+        <option>Børnecykel</option>
+      </select>
+      <select>
+        <option>Alle steder</option>
+        <option>København</option>
+        <option>Aarhus</option>
+        <option>Odense</option>
+        <option>Aalborg</option>
+        <option>Hele Danmark</option>
+      </select>
+      <button>🔍 Søg</button>
+    </div>
+  </div>
+
+  <!-- ── HURTIGFILTER PILLS ── -->
+  <div class="filters-row">
+    <span class="filters-label">Hurtigfilter:</span>
+    <span class="pill active" onclick="togglePill(this)">Alle</span>
+    <span class="pill" onclick="togglePill(this)">Under 3.000 kr</span>
+    <span class="pill" onclick="togglePill(this)">El-cykler</span>
+    <span class="pill" onclick="togglePill(this)">Kun forhandlere</span>
+    <span class="pill" onclick="togglePill(this)">Kun private</span>
+    <span class="pill" onclick="togglePill(this)">Ny annonce</span>
+    <span class="pill" onclick="togglePill(this)">Med garanti</span>
+  </div>
+
+  <!-- ── MAIN: SIDEBAR + ANNONCER ── -->
+  <div class="main">
+
+    <!-- Sidebar filtre -->
+    <aside class="sidebar">
+      <div class="sidebar-box">
+        <h3>Sælgertype</h3>
+        <div class="filter-group">
+          <label class="filter-option"><input type="checkbox" checked> Alle sælgere <span class="filter-count">4.800</span></label>
+          <label class="filter-option"><input type="checkbox"> 🏪 Forhandlere <span class="filter-count">1.240</span></label>
+          <label class="filter-option"><input type="checkbox"> 👤 Private <span class="filter-count">3.560</span></label>
+        </div>
+      </div>
+      <div class="sidebar-box">
+        <h3>Cykeltype</h3>
+        <div class="filter-group">
+          <label class="filter-option"><input type="checkbox"> Racercykel <span class="filter-count">820</span></label>
+          <label class="filter-option"><input type="checkbox"> Mountainbike <span class="filter-count">640</span></label>
+          <label class="filter-option"><input type="checkbox"> El-cykel <span class="filter-count">1.140</span></label>
+          <label class="filter-option"><input type="checkbox"> Citybike <span class="filter-count">930</span></label>
+          <label class="filter-option"><input type="checkbox"> Ladcykel <span class="filter-count">280</span></label>
+          <label class="filter-option"><input type="checkbox"> Børnecykel <span class="filter-count">440</span></label>
+          <label class="filter-option"><input type="checkbox"> Gravel <span class="filter-count">210</span></label>
+        </div>
+      </div>
+      <div class="sidebar-box">
+        <h3>Pris</h3>
+        <div class="price-range">
+          <div class="price-inputs">
+            <input type="number" placeholder="Min kr." min="0">
+            <span>–</span>
+            <input type="number" placeholder="Max kr." min="0">
+          </div>
+          <button class="btn-apply">Anvend</button>
+        </div>
+      </div>
+      <div class="sidebar-box">
+        <h3>Stand</h3>
+        <div class="filter-group">
+          <label class="filter-option"><input type="checkbox"> Ny <span class="filter-count">340</span></label>
+          <label class="filter-option"><input type="checkbox"> Som ny <span class="filter-count">870</span></label>
+          <label class="filter-option"><input type="checkbox"> God stand <span class="filter-count">2.100</span></label>
+          <label class="filter-option"><input type="checkbox"> Brugt <span class="filter-count">1.490</span></label>
+        </div>
+      </div>
+      <div class="sidebar-box">
+        <h3>Hjulstørrelse</h3>
+        <div class="filter-group">
+          <label class="filter-option"><input type="checkbox"> 26" <span class="filter-count">480</span></label>
+          <label class="filter-option"><input type="checkbox"> 27.5" / 650b <span class="filter-count">620</span></label>
+          <label class="filter-option"><input type="checkbox"> 28" <span class="filter-count">1.840</span></label>
+          <label class="filter-option"><input type="checkbox"> 29" <span class="filter-count">730</span></label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Annonceliste -->
+    <div>
+      <div class="listings-header">
+        <div>
+          <h2>Seneste annoncer</h2>
+          <span>4.823 cykler til salg</span>
+        </div>
+        <select class="sort-select">
+          <option>Nyeste først</option>
+          <option>Pris: lav til høj</option>
+          <option>Pris: høj til lav</option>
+          <option>Tættest på dig</option>
+        </select>
+      </div>
+      <div class="listings-grid" id="listings-grid">
+        <!-- Annoncekort indsættes af JavaScript -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── FORHANDLER-SEKTION ── -->
+  <section class="dealer-strip">
+    <h2>Autoriserede forhandlere</h2>
+    <p>Køb med tryghed fra en af vores verificerede cykelforhandlere — alle med garanti, servicehistorik og professionel rådgivning.</p>
+    <div class="dealer-cards">
+      <div class="dealer-card">
+        <div class="dealer-logo">🏪</div>
+        <div class="dealer-name">VeloShop Kbh</div>
+        <div class="dealer-city">København NV</div>
+        <div class="dealer-count">84 aktive annoncer</div>
+      </div>
+      <div class="dealer-card">
+        <div class="dealer-logo">🚲</div>
+        <div class="dealer-name">Cykel Expert Aarhus</div>
+        <div class="dealer-city">Aarhus C</div>
+        <div class="dealer-count">62 aktive annoncer</div>
+      </div>
+      <div class="dealer-card">
+        <div class="dealer-logo">⚡</div>
+        <div class="dealer-name">ElCyklen.dk</div>
+        <div class="dealer-city">Odense</div>
+        <div class="dealer-count">128 aktive annoncer</div>
+      </div>
+      <div class="dealer-card">
+        <div class="dealer-logo">🏆</div>
+        <div class="dealer-name">Nordic Bikes</div>
+        <div class="dealer-city">Frederiksberg</div>
+        <div class="dealer-count">47 aktive annoncer</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="logo">Cykel<span>børsen</span></div>
+    <p>© 2024 Cykelbørsen · Alle rettigheder forbeholdes</p>
+    <div class="footer-links">
+      <a href="#">Vilkår</a>
+      <a href="#">Privatlivspolitik</a>
+      <a href="#">Kontakt</a>
+      <a href="#">Bliv forhandler</a>
+    </div>
+  </footer>
+
+  <!-- ── OPRET ANNONCE MODAL ── -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Sæt din cykel til salg</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <p class="modal-seller-label">Hvem sælger du som?</p>
+        <div class="seller-toggle">
+          <div class="seller-type-btn selected" id="type-private" onclick="selectType('private')">
+            <span class="type-icon">👤</span>
+            <span class="type-label">Privatperson</span>
+            <span class="type-sub">Sælger min egen cykel</span>
+          </div>
+          <div class="seller-type-btn" id="type-dealer" onclick="selectType('dealer')">
+            <span class="type-icon">🏪</span>
+            <span class="type-label">Forhandler</span>
+            <span class="type-sub">Jeg er cykelbutik / forhandler</span>
+          </div>
+        </div>
+
+        <!-- Kun synligt for forhandlere -->
+        <div id="dealer-fields" class="dealer-fields-hidden">
+          <div class="form-group">
+            <label>Butiksnavn / CVR</label>
+            <input type="text" placeholder="f.eks. VeloShop ApS eller 12345678">
+          </div>
+        </div>
+
+        <!-- Annonce-formular -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Mærke *</label>
+            <input type="text" placeholder="f.eks. Trek, Giant, Specialized">
+          </div>
+          <div class="form-group">
+            <label>Model *</label>
+            <input type="text" placeholder="f.eks. FX 3 Disc">
+          </div>
+          <div class="form-group">
+            <label>Cykeltype *</label>
+            <select>
+              <option value="">Vælg type</option>
+              <option>Racercykel</option>
+              <option>Mountainbike</option>
+              <option>Citybike</option>
+              <option>El-cykel</option>
+              <option>Ladcykel</option>
+              <option>Børnecykel</option>
+              <option>Gravel</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ramme / str.</label>
+            <select>
+              <option value="">Vælg</option>
+              <option>XS (44–48 cm)</option>
+              <option>S (49–52 cm)</option>
+              <option>M (53–56 cm)</option>
+              <option>L (57–60 cm)</option>
+              <option>XL (61+ cm)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Pris (kr.) *</label>
+            <input type="number" placeholder="f.eks. 4500">
+          </div>
+          <div class="form-group">
+            <label>Årstal</label>
+            <input type="number" placeholder="f.eks. 2021">
+          </div>
+          <div class="form-group">
+            <label>Stand *</label>
+            <select>
+              <option value="">Vælg stand</option>
+              <option>Ny</option>
+              <option>Som ny</option>
+              <option>God stand</option>
+              <option>Brugt</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>By *</label>
+            <input type="text" placeholder="f.eks. København">
+          </div>
+          <div class="form-group full">
+            <label>Beskrivelse</label>
+            <textarea placeholder="Beskriv din cykel — stand, udstyr, service, historik..."></textarea>
+          </div>
+          <div class="form-group full">
+            <label>Billeder</label>
+            <div class="img-upload" onclick="alert('Billedupload — tilslut til backend')">
+              <div class="upload-icon">📷</div>
+              <p>Klik for at uploade billeder<br><small>Maks 8 billeder · JPG, PNG</small></p>
+            </div>
+          </div>
+        </div>
+
+        <button class="form-submit" onclick="submitListing()">Opret annonce gratis</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TOAST BESKED ── -->
+  <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
+
+  <script src="main.js"></script>
+</body>
+</html>
