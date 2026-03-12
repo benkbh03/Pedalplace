@@ -871,3 +871,156 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 
   .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   PROFIL
+   ============================================================ */
+
+/* Avatar-knap i nav */
+.nav-profile { margin-left: 4px; }
+.profile-avatar-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--rust);
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-avatar-btn:hover { background: var(--rust-light); }
+
+/* Profil header inde i modal */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.profile-big-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: var(--sand);
+  font-size: 1.4rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.profile-name {
+  font-family: 'Fraunces', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.profile-email { font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+
+/* Profil faner */
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 22px;
+}
+.profile-tab {
+  background: none;
+  border: none;
+  padding: 10px 18px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.profile-tab:hover { color: var(--charcoal); }
+.profile-tab.active {
+  color: var(--forest);
+  border-bottom-color: var(--forest);
+}
+
+/* Log ud knap */
+.btn-logout {
+  background: transparent;
+  color: var(--rust);
+  border: 1.5px solid var(--rust);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-logout:hover {
+  background: var(--rust);
+  color: #fff;
+}
+
+/* Mine annoncer grid */
+.my-listings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.my-listing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--sand);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  gap: 12px;
+}
+.my-listing-info { flex: 1; }
+.my-listing-title {
+  font-family: 'Fraunces', serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.my-listing-meta { font-size: 0.78rem; color: var(--muted); }
+.my-listing-price {
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  color: var(--rust);
+  font-size: 1rem;
+  white-space: nowrap;
+}
+.btn-delete {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-delete:hover {
+  border-color: var(--rust);
+  color: var(--rust);
+}
+
+/* Sælger-type toggle i profil */
+#edit-seller-type { cursor: pointer; }
