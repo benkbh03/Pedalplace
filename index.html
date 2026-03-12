@@ -319,6 +319,41 @@
     </div>
   </div>
 
+  <!-- ── LOGIN / REGISTRERING MODAL ── -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="login-modal-title">Log ind</h2>
+        <button class="modal-close" onclick="closeLoginModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="seller-toggle" style="margin-bottom:24px;">
+          <div class="seller-type-btn selected" id="tab-login" onclick="switchTab('login')">
+            <span class="type-label">Log ind</span>
+          </div>
+          <div class="seller-type-btn" id="tab-register" onclick="switchTab('register')">
+            <span class="type-label">Opret konto</span>
+          </div>
+        </div>
+        <div id="form-login">
+          <div class="form-grid" style="grid-template-columns:1fr;">
+            <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="din@email.dk"></div>
+            <div class="form-group"><label>Adgangskode</label><input type="password" id="login-password" placeholder="••••••••"></div>
+          </div>
+          <button class="form-submit" onclick="handleLogin()">Log ind</button>
+        </div>
+        <div id="form-register" style="display:none;">
+          <div class="form-grid" style="grid-template-columns:1fr;">
+            <div class="form-group"><label>Navn</label><input type="text" id="register-name" placeholder="Dit fulde navn"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="register-email" placeholder="din@email.dk"></div>
+            <div class="form-group"><label>Adgangskode</label><input type="password" id="register-password" placeholder="Mindst 6 tegn"></div>
+          </div>
+          <button class="form-submit" onclick="handleRegister()">Opret konto</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── TOAST BESKED ── -->
   <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
 
