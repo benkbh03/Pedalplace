@@ -451,6 +451,53 @@
     <button class="form-submit" onclick="closeMobileFilter()" style="margin-top:8px;">Vis resultater</button>
   </div>
 
+  <!-- ── NY ADGANGSKODE MODAL ── -->
+  <div class="modal-overlay" id="reset-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Vælg ny adgangskode</h2>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:18px;">Indtast din nye adgangskode nedenfor.</p>
+        <div class="form-grid" style="grid-template-columns:1fr;">
+          <div class="form-group">
+            <label>Ny adgangskode</label>
+            <input type="password" id="reset-password" placeholder="Mindst 6 tegn">
+          </div>
+          <div class="form-group">
+            <label>Gentag adgangskode</label>
+            <input type="password" id="reset-password-confirm" placeholder="Gentag adgangskode">
+          </div>
+        </div>
+        <button class="form-submit" onclick="handleResetPassword()">Gem ny adgangskode</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NULSTIL ADGANGSKODE MODAL ── -->
+  <div class="modal-overlay" id="reset-modal">
+    <div class="modal" style="max-width:460px;">
+      <div class="modal-header">
+        <h2>Vælg ny adgangskode</h2>
+        <button class="modal-close" onclick="closeResetModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:20px;">Vælg en ny adgangskode til din konto.</p>
+        <div class="form-grid" style="grid-template-columns:1fr;">
+          <div class="form-group">
+            <label>Ny adgangskode</label>
+            <input type="password" id="reset-pw1" placeholder="Mindst 6 tegn">
+          </div>
+          <div class="form-group">
+            <label>Gentag adgangskode</label>
+            <input type="password" id="reset-pw2" placeholder="Gentag adgangskode">
+          </div>
+        </div>
+        <button class="form-submit" onclick="handleResetPassword()">Gem ny adgangskode</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── TOAST BESKED ── -->
   <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
 
