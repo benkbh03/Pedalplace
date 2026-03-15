@@ -942,6 +942,23 @@ async function loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sel
   renderBikes(filtered);
 }
 
+
+/* ============================================================
+   MOBIL FILTER DRAWER
+   ============================================================ */
+
+function openMobileFilter() {
+  document.getElementById('mobile-filter-drawer').classList.add('open');
+  document.getElementById('mobile-filter-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileFilter() {
+  document.getElementById('mobile-filter-drawer').classList.remove('open');
+  document.getElementById('mobile-filter-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -968,6 +985,8 @@ window.logout            = logout;
 window.searchBikes       = searchBikes;
 window.sortBikes         = sortBikes;
 window.applyFilters       = applyFilters;
+window.openMobileFilter   = openMobileFilter;
+window.closeMobileFilter  = closeMobileFilter;
 window.openBikeModal      = openBikeModal;
 window.closeBikeModal     = closeBikeModal;
 window.toggleBidBox       = toggleBidBox;
