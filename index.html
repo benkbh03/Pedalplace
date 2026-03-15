@@ -240,11 +240,13 @@
           <div class="form-group"><label>By *</label><input type="text" placeholder="f.eks. København"></div>
           <div class="form-group full"><label>Beskrivelse</label><textarea placeholder="Beskriv din cykel — stand, udstyr, service, historik..."></textarea></div>
           <div class="form-group full">
-            <label>Billeder</label>
-            <div class="img-upload" onclick="alert('Billedupload — tilslut til backend')">
+            <label>Billeder <small style="color:var(--muted);font-weight:400">(maks 8 · JPG, PNG)</small></label>
+            <div class="img-upload" onclick="document.getElementById('img-file-input').click()">
               <div class="upload-icon">📷</div>
-              <p>Klik for at uploade billeder<br><small>Maks 8 billeder · JPG, PNG</small></p>
+              <p id="upload-label">Klik for at vælge billeder</p>
             </div>
+            <input type="file" id="img-file-input" accept="image/*" multiple style="display:none" onchange="previewImages(this)">
+            <div id="img-preview-grid" class="img-preview-grid"></div>
           </div>
         </div>
         <button class="form-submit" onclick="submitListing()">Opret annonce gratis</button>
