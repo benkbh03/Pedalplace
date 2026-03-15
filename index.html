@@ -498,6 +498,57 @@
     </div>
   </div>
 
+  <!-- ── REDIGER ANNONCE MODAL ── -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Rediger annonce</h2>
+        <button class="modal-close" onclick="closeEditModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-bike-id">
+        <div class="form-grid">
+          <div class="form-group"><label>Mærke *</label><input type="text" id="edit-brand" placeholder="f.eks. Trek"></div>
+          <div class="form-group"><label>Model *</label><input type="text" id="edit-model" placeholder="f.eks. FX 3"></div>
+          <div class="form-group">
+            <label>Cykeltype *</label>
+            <select id="edit-type">
+              <option value="">Vælg type</option>
+              <option>Racercykel</option><option>Mountainbike</option><option>Citybike</option>
+              <option>El-cykel</option><option>Ladcykel</option><option>Børnecykel</option><option>Gravel</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Ramme / str.</label>
+            <select id="edit-size">
+              <option value="">Vælg</option>
+              <option>XS (44–48 cm)</option><option>S (49–52 cm)</option><option>M (53–56 cm)</option>
+              <option>L (57–60 cm)</option><option>XL (61+ cm)</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Pris (kr.) *</label><input type="number" id="edit-price" placeholder="f.eks. 4500"></div>
+          <div class="form-group"><label>Årstal</label><input type="number" id="edit-year" placeholder="f.eks. 2021"></div>
+          <div class="form-group">
+            <label>Stand *</label>
+            <select id="edit-condition">
+              <option value="">Vælg stand</option>
+              <option>Ny</option><option>Som ny</option><option>God stand</option><option>Brugt</option>
+            </select>
+          </div>
+          <div class="form-group"><label>By *</label><input type="text" id="edit-city" placeholder="f.eks. København"></div>
+          <div class="form-group full"><label>Beskrivelse</label><textarea id="edit-description" placeholder="Beskriv din cykel..."></textarea></div>
+          <div class="form-group full">
+            <label class="toggle-label">
+              <input type="checkbox" id="edit-is-active">
+              <span>Annonce er aktiv (synlig for andre)</span>
+            </label>
+          </div>
+        </div>
+        <button class="form-submit" onclick="saveEditedListing()">Gem ændringer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── TOAST BESKED ── -->
   <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
 
