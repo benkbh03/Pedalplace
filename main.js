@@ -49,6 +49,7 @@ async function init() {
 
   loadBikes();
   updateFilterCounts();
+  checkPasswordReset();
 }
 
 function updateNav(loggedIn, name) {
@@ -312,6 +313,7 @@ async function submitListing() {
   showToast('✅ Din annonce er oprettet!');
   loadBikes();
   updateFilterCounts();
+  checkPasswordReset();
 }
 
 /* ============================================================
@@ -493,6 +495,7 @@ async function deleteListing(id) {
   loadMyListings();
   loadBikes();
   updateFilterCounts();
+  checkPasswordReset();
 }
 
 async function loadSavedListings() {
@@ -993,6 +996,52 @@ supabase.auth.onAuthStateChange((_event, session) => {
   }
 });
 
+
+/* ============================================================
+   NULSTIL ADGANGSKODE – fang token fra URL ved sideload
+   ============================================================ */
+
+async function checkPasswordReset() {
+  // Supabase sætter #access_token i URL'en efter reset-klik
+  const hash   = window.location.hash;
+  const params = new URLSearchParams(hash.replace('#', '?'));
+  const type   = params.get('type');
+
+  if (type === 'recovery') {
+    // Vis reset-modal med det samme
+    openResetModal();
+  }
+}
+
+function openResetModal() {
+  document.getElementById('reset-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeResetModal() {
+  document.getElementById('reset-modal').classList.remove('open');
+  document.body.style.overflow = '';
+  // Ryd hash fra URL
+  history.replaceState(null, '', window.location.pathname);
+}
+
+async function handleResetPassword() {
+  const pw1 = document.getElementById('reset-pw1').value;
+  const pw2 = document.getElementById('reset-pw2').value;
+
+  if (!pw1 || pw1.length < 6) { showToast('⚠️ Adgangskode skal være mindst 6 tegn'); return; }
+  if (pw1 !== pw2)             { showToast('⚠️ Adgangskoderne matcher ikke'); return; }
+
+  const { error } = await supabase.auth.updateUser({ password: pw1 });
+
+  if (error) {
+    showToast('❌ Kunne ikke opdatere adgangskode');
+    console.error(error);
+  } else {
+    closeResetModal();
+    showToast('✅ Adgangskode opdateret! Du er nu logget ind.');
+  }
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1021,6 +1070,8 @@ window.sortBikes         = sortBikes;
 window.applyFilters       = applyFilters;
 window.openMobileFilter   = openMobileFilter;
 window.closeMobileFilter  = closeMobileFilter;
+window.closeResetModal    = closeResetModal;
+window.handleResetPassword = handleResetPassword;
 window.handleResetPassword = handleResetPassword;
 window.openBikeModal      = openBikeModal;
 window.closeBikeModal     = closeBikeModal;
