@@ -1402,3 +1402,250 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   transition: color 0.15s;
 }
 .btn-back-login:hover { color: var(--charcoal); }
+
+/* ============================================================
+   MOBIL – KOMPLET RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+  /* ── NAV ── */
+  nav {
+    padding: 14px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--forest);
+  }
+  .nav-links {
+    gap: 0;
+  }
+  .nav-links a:not(.btn-sell) {
+    display: none; /* Skjul tekst-links på mobil */
+  }
+  .btn-sell {
+    font-size: 0.8rem;
+    padding: 8px 14px;
+  }
+  .logo { font-size: 1.3rem; }
+
+  /* ── HERO ── */
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 32px 16px 24px;
+    gap: 24px;
+  }
+  .hero h1 { font-size: 2.8rem; line-height: 1.1; }
+  .hero p  { font-size: 0.9rem; }
+  .hero-btns { flex-direction: column; gap: 10px; }
+  .hero-btns button { width: 100%; }
+  .hero-stats {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stat-card {
+    min-width: 130px;
+    padding: 14px;
+    flex-shrink: 0;
+  }
+  .stat-number { font-size: 1.4rem; }
+
+  /* ── SØGEBAR ── */
+  .search-section { padding: 16px; }
+  .search-bar {
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .search-bar input,
+  .search-bar select,
+  .search-bar button {
+    width: 100%;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  .search-bar button { padding: 12px; }
+
+  /* ── HURTIGFILTER ── */
+  .filters-row {
+    padding: 12px 16px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filters-label { display: none; }
+  .pill { flex-shrink: 0; font-size: 0.8rem; padding: 7px 14px; }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* ── SIDEBAR → MOBIL FILTER KNAP ── */
+  .sidebar { display: none; }
+  .mobile-filter-bar {
+    display: flex !important;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .btn-mobile-filter {
+    flex: 1;
+    background: var(--sand);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: border-color 0.15s;
+  }
+  .btn-mobile-filter:hover { border-color: var(--forest); }
+
+  /* ── MOBIL FILTER DRAWER ── */
+  .mobile-filter-drawer {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--cream);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px 40px;
+    z-index: 200;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.15);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .mobile-filter-drawer.open {
+    display: block;
+    transform: translateY(0);
+  }
+  .drawer-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .drawer-header h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .drawer-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .mobile-filter-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 199;
+  }
+  .mobile-filter-overlay.open { display: block; }
+
+  /* ── ANNONCER GRID ── */
+  .listings-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .listings-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .sort-select { width: 100%; }
+
+  /* ── CYKEL KORT ── */
+  .bike-card-img { height: 180px; }
+  .bike-title { font-size: 1rem; }
+  .bike-price { font-size: 1.1rem; }
+
+  /* ── FORHANDLER SEKTION ── */
+  .dealer-strip { padding: 28px 16px; }
+  .dealer-strip h2 { font-size: 1.5rem; }
+  .dealer-cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .dealer-card { padding: 16px 12px; }
+
+  /* ── FOOTER ── */
+  footer { padding: 28px 16px; gap: 12px; }
+  .footer-links { flex-wrap: wrap; justify-content: center; gap: 12px; }
+
+  /* ── MODALER ── */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  .modal-wide { max-width: 100%; }
+  .modal-header { padding: 20px 20px 16px; }
+  .modal-body   { padding: 0 20px 40px; }
+
+  /* Annonce detalje på mobil */
+  .bike-detail-grid { grid-template-columns: 1fr; gap: 16px; }
+  .bike-detail-img  { height: 220px; }
+  .bike-detail-price { font-size: 1.8rem; }
+
+  /* Profil modal */
+  .profile-header { gap: 14px; }
+  .profile-big-avatar { width: 52px; height: 52px; font-size: 1.1rem; }
+  .profile-tabs { overflow-x: auto; gap: 0; }
+  .profile-tab  { padding: 10px 14px; font-size: 0.82rem; flex-shrink: 0; }
+
+  /* Seller toggle i modal */
+  .seller-toggle { gap: 8px; }
+  .seller-type-btn { padding: 12px 8px; }
+  .type-label { font-size: 0.85rem; }
+  .type-sub   { font-size: 0.72rem; }
+
+  /* Form grid */
+  .form-grid { grid-template-columns: 1fr !important; }
+  .form-group.full { grid-column: 1; }
+}
+
+/* Tablets (768–1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .hero { padding: 48px 32px; gap: 32px; }
+  .hero h1 { font-size: 3rem; }
+  .main { padding: 24px 32px; gap: 24px; }
+  .listings-grid { grid-template-columns: repeat(2, 1fr); }
+  .dealer-cards { grid-template-columns: repeat(2, 1fr); }
+  .modal { max-width: 600px; }
+}
+
+/* Desktop – vis ikke mobil-filter-bar */
+@media (min-width: 769px) {
+  .mobile-filter-bar    { display: none !important; }
+  .mobile-filter-drawer { display: none !important; }
+  .mobile-filter-overlay { display: none !important; }
+}
