@@ -483,7 +483,10 @@ async function loadMyListings() {
         <div class="my-listing-meta">${b.type} · ${b.city} · ${b.condition}</div>
       </div>
       <div class="my-listing-price">${b.price.toLocaleString('da-DK')} kr.</div>
-      <button class="btn-delete" onclick="deleteListing('${b.id}')">Slet</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-edit" onclick="openEditModal('${b.id}')">✏️ Rediger</button>
+        <button class="btn-delete" onclick="deleteListing('${b.id}')">Slet</button>
+      </div>
     </div>`).join('');
 }
 
@@ -1042,6 +1045,69 @@ async function handleResetPassword() {
   }
 }
 
+
+/* ============================================================
+   REDIGER ANNONCE
+   ============================================================ */
+
+async function openEditModal(id) {
+  const { data: b, error } = await supabase
+    .from('bikes').select('*').eq('id', id).single();
+  if (error || !b) { showToast('❌ Kunne ikke hente annonce'); return; }
+
+  // Udfyld felterne
+  document.getElementById('edit-bike-id').value       = b.id;
+  document.getElementById('edit-brand').value         = b.brand || '';
+  document.getElementById('edit-model').value         = b.model || '';
+  document.getElementById('edit-price').value         = b.price || '';
+  document.getElementById('edit-year').value          = b.year || '';
+  document.getElementById('edit-city').value          = b.city || '';
+  document.getElementById('edit-description').value   = b.description || '';
+  document.getElementById('edit-type').value          = b.type || '';
+  document.getElementById('edit-size').value          = b.size || '';
+  document.getElementById('edit-condition').value     = b.condition || '';
+  document.getElementById('edit-is-active').checked   = b.is_active;
+
+  document.getElementById('edit-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function saveEditedListing() {
+  const id = document.getElementById('edit-bike-id').value;
+
+  const updates = {
+    brand:       document.getElementById('edit-brand').value,
+    model:       document.getElementById('edit-model').value,
+    title:       document.getElementById('edit-brand').value + ' ' + document.getElementById('edit-model').value,
+    price:       parseInt(document.getElementById('edit-price').value),
+    year:        parseInt(document.getElementById('edit-year').value) || null,
+    city:        document.getElementById('edit-city').value,
+    description: document.getElementById('edit-description').value,
+    type:        document.getElementById('edit-type').value,
+    size:        document.getElementById('edit-size').value,
+    condition:   document.getElementById('edit-condition').value,
+    is_active:   document.getElementById('edit-is-active').checked,
+  };
+
+  if (!updates.brand || !updates.model || !updates.price || !updates.city) {
+    showToast('⚠️ Udfyld alle påkrævede felter'); return;
+  }
+
+  const { error } = await supabase.from('bikes').update(updates).eq('id', id);
+  if (error) { showToast('❌ Kunne ikke gemme ændringer'); console.error(error); return; }
+
+  closeEditModal();
+  showToast('✅ Annonce opdateret!');
+  loadMyListings();
+  loadBikes();
+  updateFilterCounts();
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1072,7 +1138,13 @@ window.openMobileFilter   = openMobileFilter;
 window.closeMobileFilter  = closeMobileFilter;
 window.closeResetModal    = closeResetModal;
 window.handleResetPassword = handleResetPassword;
+window.openEditModal      = openEditModal;
+window.closeEditModal     = closeEditModal;
+window.saveEditedListing  = saveEditedListing;
 window.handleResetPassword = handleResetPassword;
+window.openEditModal      = openEditModal;
+window.closeEditModal     = closeEditModal;
+window.saveEditedListing  = saveEditedListing;
 window.openBikeModal      = openBikeModal;
 window.closeBikeModal     = closeBikeModal;
 window.toggleBidBox       = toggleBidBox;
