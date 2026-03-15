@@ -305,10 +305,17 @@ async function submitListing() {
     showToast('⚠️ Udfyld alle påkrævede felter (*)'); return;
   }
 
-  const { error } = await supabase.from('bikes').insert(bikeData);
+  const { data: newBike, error } = await supabase.from('bikes').insert(bikeData).select().single();
   if (error) { showToast('❌ Noget gik galt – prøv igen'); console.error(error); return; }
 
+  // Upload billeder hvis der er valgt nogle
+  if (selectedFiles.length > 0) {
+    showToast('⏳ Uploader billeder...');
+    await uploadImages(newBike.id);
+  }
+
   closeModal();
+  resetImageUpload();
   showToast('✅ Din annonce er oprettet!');
   loadBikes();
   updateFilterCounts();
@@ -1060,6 +1067,107 @@ async function saveEditedListing() {
   updateFilterCounts();
 }
 
+
+/* ============================================================
+   BILLEDE UPLOAD
+   ============================================================ */
+
+let selectedFiles = []; // { file, url, isPrimary }
+
+function previewImages(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  // Maks 8 billeder i alt
+  const remaining = 8 - selectedFiles.length;
+  const toAdd = files.slice(0, remaining);
+
+  toAdd.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    selectedFiles.push({
+      file,
+      url,
+      isPrimary: selectedFiles.length === 0 && i === 0, // Første billede er primær
+    });
+  });
+
+  renderImagePreviews();
+  document.getElementById('upload-label').textContent =
+    `${selectedFiles.length} billede${selectedFiles.length !== 1 ? 'r' : ''} valgt`;
+}
+
+function renderImagePreviews() {
+  const grid = document.getElementById('img-preview-grid');
+  if (!grid) return;
+
+  grid.innerHTML = selectedFiles.map((item, i) => `
+    <div class="img-preview-item ${item.isPrimary ? 'primary' : ''}">
+      <img src="${item.url}" alt="Billede ${i+1}">
+      ${item.isPrimary ? '<span class="primary-badge">Primær</span>' : ''}
+      ${!item.isPrimary ? `<button class="set-primary" onclick="setPrimary(${i})">★</button>` : ''}
+      <button class="remove-img" onclick="removeImage(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function setPrimary(index) {
+  selectedFiles = selectedFiles.map((item, i) => ({ ...item, isPrimary: i === index }));
+  renderImagePreviews();
+}
+
+function removeImage(index) {
+  URL.revokeObjectURL(selectedFiles[index].url);
+  selectedFiles.splice(index, 1);
+  // Sæt første som primær hvis den primære blev fjernet
+  if (selectedFiles.length > 0 && !selectedFiles.some(f => f.isPrimary)) {
+    selectedFiles[0].isPrimary = true;
+  }
+  renderImagePreviews();
+  const label = document.getElementById('upload-label');
+  if (label) label.textContent = selectedFiles.length > 0
+    ? `${selectedFiles.length} billede${selectedFiles.length !== 1 ? 'r' : ''} valgt`
+    : 'Klik for at vælge billeder';
+}
+
+async function uploadImages(bikeId) {
+  if (selectedFiles.length === 0) return;
+
+  for (const item of selectedFiles) {
+    const ext      = item.file.name.split('.').pop();
+    const filename = `${bikeId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const { data, error } = await supabase.storage
+      .from('bike-images')
+      .upload(filename, item.file, { contentType: item.file.type, upsert: false });
+
+    if (error) { console.error('Upload fejl:', error); continue; }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('bike-images')
+      .getPublicUrl(filename);
+
+    await supabase.from('bike_images').insert({
+      bike_id:    bikeId,
+      url:        publicUrl,
+      is_primary: item.isPrimary,
+    });
+  }
+
+  // Ryd valgte filer
+  selectedFiles.forEach(f => URL.revokeObjectURL(f.url));
+  selectedFiles = [];
+}
+
+function resetImageUpload() {
+  selectedFiles = [];
+  const grid  = document.getElementById('img-preview-grid');
+  const label = document.getElementById('upload-label');
+  const input = document.getElementById('img-file-input');
+  if (grid)  grid.innerHTML = '';
+  if (label) label.textContent = 'Klik for at vælge billeder';
+  if (input) input.value = '';
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1093,6 +1201,9 @@ window.handleResetPassword = handleResetPassword;
 window.openEditModal      = openEditModal;
 window.closeEditModal     = closeEditModal;
 window.saveEditedListing  = saveEditedListing;
+window.previewImages      = previewImages;
+window.setPrimary         = setPrimary;
+window.removeImage        = removeImage;
 window.openBikeModal      = openBikeModal;
 window.closeBikeModal     = closeBikeModal;
 window.toggleBidBox       = toggleBidBox;
