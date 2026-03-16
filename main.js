@@ -2,7 +2,6 @@
    CYKELBØRSEN – main.js
    ============================================================ */
 
-
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
 const SUPABASE_URL = 'https://ktufgncydxhkhfttojkh.supabase.co';
@@ -29,6 +28,7 @@ async function init() {
     currentProfile = profile;
 
     updateNav(true, profile?.name);
+    startRealtimeNotifications();
   } else {
     updateNav(false);
   }
@@ -1183,6 +1183,39 @@ function resetImageUpload() {
 }
 
 
+
+/* ============================================================
+   REAL-TIME NOTIFIKATIONER
+   ============================================================ */
+
+function startRealtimeNotifications() {
+  if (!currentUser) return;
+
+  supabase
+    .channel('new-messages')
+    .on('postgres_changes', {
+      event:  'INSERT',
+      schema: 'public',
+      table:  'messages',
+      filter: 'receiver_id=eq.' + currentUser.id,
+    }, function(payload) {
+      // Ny besked modtaget
+      const msg    = payload.new;
+      const isBid  = msg.content && msg.content.indexOf('💰') === 0;
+      const label  = isBid ? '💰 Nyt bud modtaget!' : '✉️ Ny besked modtaget!';
+      showToast(label);
+      updateInboxBadge();
+
+      // Puls-animation på indbakke-knappen
+      const btn = document.getElementById('nav-inbox-btn');
+      if (btn) {
+        btn.classList.add('inbox-pulse');
+        setTimeout(function() { btn.classList.remove('inbox-pulse'); }, 2000);
+      }
+    })
+    .subscribe();
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1405,6 +1438,7 @@ async function updateInboxBadge() {
 }
 
 window.openInboxModal   = openInboxModal;
+window.startRealtimeNotifications = startRealtimeNotifications;
 window.closeInboxModal  = closeInboxModal;
 window.openInboxThread  = openInboxThread;
 window.closeInboxThread = closeInboxThread;
