@@ -1191,29 +1191,34 @@ function resetImageUpload() {
 function startRealtimeNotifications() {
   if (!currentUser) return;
 
-  supabase
-    .channel('new-messages')
+  // Tjek badge med det samme ved opstart
+  updateInboxBadge();
+
+  const channel = supabase
+    .channel('new-messages-' + currentUser.id)
     .on('postgres_changes', {
       event:  'INSERT',
       schema: 'public',
       table:  'messages',
-      filter: 'receiver_id=eq.' + currentUser.id,
     }, function(payload) {
-      // Ny besked modtaget
-      const msg    = payload.new;
-      const isBid  = msg.content && msg.content.indexOf('💰') === 0;
-      const label  = isBid ? '💰 Nyt bud modtaget!' : '✉️ Ny besked modtaget!';
-      showToast(label);
+      const msg = payload.new;
+      // Kun hvis vi er modtageren
+      if (msg.receiver_id !== currentUser.id) return;
+
+      const isBid = msg.content && msg.content.indexOf('💰') === 0;
+      showToast(isBid ? '💰 Nyt bud modtaget!' : '✉️ Ny besked modtaget!');
       updateInboxBadge();
 
-      // Puls-animation på indbakke-knappen
       const btn = document.getElementById('nav-inbox-btn');
       if (btn) {
         btn.classList.add('inbox-pulse');
         setTimeout(function() { btn.classList.remove('inbox-pulse'); }, 2000);
       }
-    })
-    .subscribe();
+    });
+
+  channel.subscribe(function(status) {
+    console.log('Realtime status:', status);
+  });
 }
 
 /* ============================================================
