@@ -1814,3 +1814,93 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .inbox-pulse {
   animation: inboxPulse 0.6s ease 3;
 }
+
+/* ── FORHANDLER SEKTION OPDATERET ── */
+.dealer-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.dealer-strip-header h2 { margin-bottom: 8px; }
+.dealer-strip-header p  { margin-bottom: 0; }
+
+.btn-become-dealer {
+  background: var(--rust);
+  color: #fff;
+  border: none;
+  padding: 13px 24px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.btn-become-dealer:hover { background: var(--rust-light); }
+
+/* Tom forhandler state */
+.dealer-empty-state {
+  grid-template-columns: 1fr !important;
+}
+.dealer-empty-card {
+  background: rgba(245,240,232,0.06);
+  border: 2px dashed rgba(245,240,232,0.2);
+  border-radius: 14px;
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--sand);
+}
+.dealer-empty-card h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+}
+.dealer-empty-card p {
+  opacity: 0.6;
+  font-size: 0.9rem;
+  max-width: 360px;
+  margin: 0 auto 20px;
+}
+.btn-become-dealer-small {
+  background: transparent;
+  color: var(--rust-light);
+  border: 1.5px solid var(--rust-light);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+}
+.btn-become-dealer-small:hover {
+  background: var(--rust);
+  border-color: var(--rust);
+  color: #fff;
+}
+
+/* Forhandler perks */
+.dealer-perks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--sand);
+  border-radius: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+}
+.dealer-perk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* Footer bliv forhandler link */
+.footer-links a[href="#dealer"] { color: var(--rust-light); }
