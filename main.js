@@ -28,6 +28,7 @@ async function init() {
     currentProfile = profile;
 
     updateNav(true, profile?.name);
+    updateInboxBadge();
   } else {
     updateNav(false);
   }
@@ -1176,6 +1177,184 @@ function resetImageUpload() {
   if (input) input.value = '';
 }
 
+
+/* ============================================================
+   INDBAKKE MODAL (nav-knap)
+   ============================================================ */
+
+let activeInboxThread = null;
+
+async function openInboxModal() {
+  document.getElementById('inbox-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('inbox-modal-list').style.display = 'flex';
+  document.getElementById('inbox-modal-thread').style.display = 'none';
+  await loadInboxModal();
+}
+
+function closeInboxModal() {
+  document.getElementById('inbox-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('inbox-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeInboxModal();
+});
+
+async function loadInboxModal() {
+  if (!currentUser) return;
+  const list = document.getElementById('inbox-modal-list');
+  list.innerHTML = '<p style="color:var(--muted)">Henter beskeder...</p>';
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select(\`
+      *,
+      bikes(brand, model),
+      sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type),
+      receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)
+    \`)
+    .or(\`sender_id.eq.\${currentUser.id},receiver_id.eq.\${currentUser.id}\`)
+    .order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Du har ingen beskeder endnu.</p>';
+    return;
+  }
+
+  // Grupper i tråde
+  const threads = {};
+  data.forEach(msg => {
+    const otherId   = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+    const otherProf = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
+    const key       = \`\${msg.bike_id}_\${otherId}\`;
+    if (!threads[key]) {
+      threads[key] = {
+        bikeId:    msg.bike_id,
+        bike:      msg.bikes,
+        otherId,
+        otherName: otherProf?.seller_type === 'dealer' ? otherProf?.shop_name : otherProf?.name,
+        messages:  [],
+        hasUnread: false,
+      };
+    }
+    threads[key].messages.push(msg);
+    if (!msg.read && msg.receiver_id === currentUser.id) threads[key].hasUnread = true;
+  });
+
+  const threadList = Object.values(threads);
+
+  list.innerHTML = threadList.map(t => {
+    const lastMsg  = t.messages[0];
+    const initials = (t.otherName || 'U').substring(0, 2).toUpperCase();
+    const preview  = lastMsg.content.length > 55 ? lastMsg.content.substring(0, 55) + '...' : lastMsg.content;
+    const time     = new Date(lastMsg.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short' });
+    const bikeName = t.bike ? \`\${t.bike.brand} \${t.bike.model}\` : 'Ukendt cykel';
+    const isBid    = lastMsg.content.startsWith('💰');
+
+    return \`
+      <div class="inbox-row \${t.hasUnread ? 'unread' : ''}"
+           onclick="openInboxThread('\${t.bikeId}', '\${t.otherId}', '\${(t.otherName||'Ukendt').replace(/'/g,'')}')">
+        <div class="inbox-avatar">\${initials}</div>
+        <div class="inbox-content">
+          <div class="inbox-from">
+            \${t.otherName || 'Ukendt'}
+            \${isBid ? '<span style="background:#FBF0E8;color:#8A4A20;font-size:.7rem;padding:2px 7px;border-radius:4px;margin-left:6px;">💰 Bud</span>' : ''}
+            \${t.hasUnread ? '<span style="background:var(--rust);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:100px;margin-left:6px;">Ny</span>' : ''}
+          </div>
+          <div class="inbox-bike">Re: \${bikeName}</div>
+          <div class="inbox-preview">\${preview}</div>
+        </div>
+        <div class="inbox-time">\${time}</div>
+      </div>\`;
+  }).join('');
+}
+
+async function openInboxThread(bikeId, otherId, otherName) {
+  activeInboxThread = { bikeId, otherId, otherName };
+
+  document.getElementById('inbox-modal-list').style.display   = 'none';
+  document.getElementById('inbox-modal-thread').style.display = 'block';
+
+  document.getElementById('inbox-modal-thread-header').innerHTML =
+    \`<strong>\${otherName}</strong> — <span style="color:var(--muted)">besked om annonce</span>\`;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('bike_id', bikeId)
+    .or(\`and(sender_id.eq.\${currentUser.id},receiver_id.eq.\${otherId}),and(sender_id.eq.\${otherId},receiver_id.eq.\${currentUser.id})\`)
+    .order('created_at', { ascending: true });
+
+  const threadEl = document.getElementById('inbox-modal-thread-messages');
+  if (error || !data) { threadEl.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>'; return; }
+
+  threadEl.innerHTML = data.map(msg => {
+    const isSent = msg.sender_id === currentUser.id;
+    const time   = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const isBid  = msg.content.startsWith('💰');
+    return \`
+      <div class="message-bubble \${isSent ? 'sent' : 'received'}" \${isBid ? 'style="border:2px solid var(--rust-light)"' : ''}>
+        \${msg.content}
+        <div class="msg-time">\${time}</div>
+      </div>\`;
+  }).join('');
+
+  threadEl.scrollTop = threadEl.scrollHeight;
+
+  // Marker som læst
+  await supabase.from('messages')
+    .update({ read: true })
+    .eq('bike_id', bikeId)
+    .eq('sender_id', otherId)
+    .eq('receiver_id', currentUser.id);
+
+  // Opdater badge
+  updateInboxBadge();
+}
+
+function closeInboxThread() {
+  activeInboxThread = null;
+  document.getElementById('inbox-modal-list').style.display   = 'flex';
+  document.getElementById('inbox-modal-thread').style.display = 'none';
+  document.getElementById('inbox-modal-reply-text').value = '';
+  loadInboxModal();
+}
+
+async function sendInboxReply() {
+  if (!activeInboxThread || !currentUser) return;
+  const content = document.getElementById('inbox-modal-reply-text').value.trim();
+  if (!content) { showToast('⚠️ Skriv et svar først'); return; }
+
+  const { error } = await supabase.from('messages').insert({
+    bike_id:     activeInboxThread.bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: activeInboxThread.otherId,
+    content,
+  });
+
+  if (error) { showToast('❌ Kunne ikke sende svar'); return; }
+  document.getElementById('inbox-modal-reply-text').value = '';
+  openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
+}
+
+async function updateInboxBadge() {
+  if (!currentUser) return;
+  const { count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('receiver_id', currentUser.id)
+    .eq('read', false);
+
+  const badge = document.getElementById('nav-inbox-badge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1223,6 +1402,11 @@ window.loadInbox          = loadInbox;
 window.openThread         = openThread;
 window.closeThread        = closeThread;
 window.sendReply          = sendReply;
+window.openInboxModal     = openInboxModal;
+window.closeInboxModal    = closeInboxModal;
+window.openInboxThread    = openInboxThread;
+window.closeInboxThread   = closeInboxThread;
+window.sendInboxReply     = sendInboxReply;
 
 /* ============================================================
    START
