@@ -55,6 +55,9 @@ async function init() {
   document.getElementById('inbox-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeInboxModal();
   });
+  document.getElementById('dealer-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeBecomeDealerModal();
+  });
 }
 
 function updateNav(loggedIn, name) {
@@ -1221,6 +1224,54 @@ function startRealtimeNotifications() {
   });
 }
 
+
+/* ============================================================
+   BLIV FORHANDLER MODAL
+   ============================================================ */
+
+function openBecomeDealerModal() {
+  document.getElementById('dealer-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeBecomeDealerModal() {
+  document.getElementById('dealer-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function submitDealerApplication() {
+  const shopName = document.getElementById('dealer-shop-name').value.trim();
+  const cvr      = document.getElementById('dealer-cvr').value.trim();
+  const contact  = document.getElementById('dealer-contact').value.trim();
+  const email    = document.getElementById('dealer-email').value.trim();
+  const phone    = document.getElementById('dealer-phone').value.trim();
+  const city     = document.getElementById('dealer-city').value.trim();
+
+  if (!shopName || !cvr || !contact || !email) {
+    showToast('⚠️ Udfyld alle påkrævede felter (*)'); return;
+  }
+
+  // Gem ansøgning som besked til admin eller gem i profiles hvis logget ind
+  if (currentUser) {
+    const { error } = await supabase.from('profiles').update({
+      shop_name:   shopName,
+      cvr:         cvr,
+      phone:       phone,
+      city:        city,
+      seller_type: 'dealer',
+    }).eq('id', currentUser.id);
+
+    if (error) { showToast('❌ Noget gik galt – prøv igen'); return; }
+  }
+
+  closeBecomeDealerModal();
+  showToast('✅ Ansøgning modtaget! Vi kontakter dig inden for 2 hverdage.');
+
+  // Ryd felter
+  ['dealer-shop-name','dealer-cvr','dealer-contact','dealer-email','dealer-phone','dealer-city']
+    .forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
 /* ============================================================
    GØR FUNKTIONER GLOBALE
    ============================================================ */
@@ -1444,7 +1495,10 @@ async function updateInboxBadge() {
 
 window.openInboxModal   = openInboxModal;
 window.startRealtimeNotifications = startRealtimeNotifications;
-window.updateInboxBadge = updateInboxBadge;
+window.updateInboxBadge        = updateInboxBadge;
+window.openBecomeDealerModal   = openBecomeDealerModal;
+window.closeBecomeDealerModal  = closeBecomeDealerModal;
+window.submitDealerApplication = submitDealerApplication;
 window.closeInboxModal  = closeInboxModal;
 window.openInboxThread  = openInboxThread;
 window.closeInboxThread = closeInboxThread;
