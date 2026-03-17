@@ -18,6 +18,9 @@
       <a onclick="showSection('dealers')">Forhandlere</a>
       <a>Om os</a>
       <a class="btn-sell" onclick="openModal()">+ Sæt til salg</a>
+      <div class="nav-admin" id="nav-admin" style="display:none;">
+        <button class="nav-admin-btn" onclick="openAdminPanel()" title="Admin panel">⚙️</button>
+      </div>
       <div class="nav-profile" id="nav-profile" style="display:none;">
         <button class="nav-inbox-btn" id="nav-inbox-btn" onclick="openInboxModal()" title="Indbakke">
           <span class="nav-inbox-icon">✉️</span>
@@ -610,6 +613,32 @@
         <button class="modal-close" onclick="closeFooterModal()">✕</button>
       </div>
       <div class="modal-body" id="footer-modal-body" style="line-height:1.7;font-size:0.9rem;"></div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN PANEL ── -->
+  <div class="modal-overlay" id="admin-modal">
+    <div class="modal" style="max-width:680px;">
+      <div class="modal-header">
+        <h2>⚙️ Admin panel</h2>
+        <button class="modal-close" onclick="closeAdminPanel()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-tabs" style="margin-bottom:20px;">
+          <button class="profile-tab active" id="atab-applications" onclick="switchAdminTab('applications')">Forhandler ansøgninger</button>
+          <button class="profile-tab" id="atab-users" onclick="switchAdminTab('users')">Alle brugere</button>
+        </div>
+        <div id="admin-applications">
+          <div id="admin-applications-list">
+            <p style="color:var(--muted)">Indlæser...</p>
+          </div>
+        </div>
+        <div id="admin-users" style="display:none;">
+          <div id="admin-users-list">
+            <p style="color:var(--muted)">Indlæser...</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
