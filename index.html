@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -168,13 +169,18 @@
           <h2>Seneste annoncer</h2>
           <span id="listings-count">– cykler til salg</span>
         </div>
-        <select class="sort-select" onchange="sortBikes(this.value)">
-          <option value="newest">Nyeste først</option>
-          <option value="price_asc">Pris: lav til høj</option>
-          <option value="price_desc">Pris: høj til lav</option>
-        </select>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="view-toggle" id="btn-list-view" onclick="setView('list')" title="Listevisning">☰</button>
+          <button class="view-toggle" id="btn-map-view" onclick="setView('map')" title="Kortvisning">🗺️</button>
+          <select class="sort-select" onchange="sortBikes(this.value)">
+            <option value="newest">Nyeste først</option>
+            <option value="price_asc">Pris: lav til høj</option>
+            <option value="price_desc">Pris: høj til lav</option>
+          </select>
+        </div>
       </div>
       <div class="listings-grid" id="listings-grid"></div>
+      <div id="listings-map" style="display:none;height:600px;border-radius:14px;overflow:hidden;border:1px solid var(--border);"></div>
     </div>
 
   </div>
@@ -724,9 +730,21 @@
     </div>
   </div>
 
+  <!-- ── KORT ANNONCE POPUP ── -->
+  <div class="modal-overlay" id="map-bike-modal">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <h2 id="map-bike-title">–</h2>
+        <button class="modal-close" onclick="document.getElementById('map-bike-modal').classList.remove('open');document.body.style.overflow=''">✕</button>
+      </div>
+      <div class="modal-body" id="map-bike-body"></div>
+    </div>
+  </div>
+
   <!-- ── TOAST BESKED ── -->
   <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>
