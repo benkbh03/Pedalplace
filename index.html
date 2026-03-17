@@ -37,7 +37,7 @@
   <section class="hero">
     <div class="hero-text">
       <h1>Find din<br>næste<br><em>to-hjuler</em></h1>
-      <p>Danmarks største marked for brugte cykler — fra private sælgere og autoriserede forhandlere. God cykel til fair pris.</p>
+      <p>Køb og sælg brugte cykler direkte — fra private sælgere og autoriserede forhandlere. Gratis at oprette annonce.</p>
       <div class="hero-btns">
         <button class="btn-primary" onclick="document.querySelector('.search-section').scrollIntoView({behavior:'smooth'})">Udforsk cykler</button>
         <button class="btn-outline" onclick="openModal()">Sælg din cykel</button>
@@ -55,14 +55,14 @@
         <div class="stat-icon">🏪</div>
         <div>
           <div class="stat-number" id="stat-dealers">–</div>
-          <div class="stat-label">Autoriserede forhandlere</div>
+          <div class="stat-label">Verificerede forhandlere</div>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">✅</div>
         <div>
           <div class="stat-number" id="stat-sold">–</div>
-          <div class="stat-label">Gennemførte handler</div>
+          <div class="stat-label">Solgte cykler</div>
         </div>
       </div>
     </div>
@@ -106,6 +106,33 @@
     <span class="pill" onclick="togglePill(this)">Ny annonce</span>
     <span class="pill" onclick="togglePill(this)">Med garanti</span>
   </div>
+
+
+  <!-- ── SÅDAN VIRKER DET ── -->
+  <section class="how-it-works" id="how-it-works">
+    <h2>Sådan virker det</h2>
+    <p class="how-subtitle">Nemt, hurtigt og gratis — uanset om du køber eller sælger</p>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-icon">📝</div>
+        <h3>Opret annonce</h3>
+        <p>Udfyld et par felter, upload billeder og sæt din pris. Det tager under 2 minutter.</p>
+      </div>
+      <div class="how-step-arrow">→</div>
+      <div class="how-step">
+        <div class="how-icon">💬</div>
+        <h3>Modtag henvendelser</h3>
+        <p>Interesserede købers kontakter dig direkte via beskeder eller bud på platformen.</p>
+      </div>
+      <div class="how-step-arrow">→</div>
+      <div class="how-step">
+        <div class="how-icon">🤝</div>
+        <h3>Aftal og sælg</h3>
+        <p>Mød køber, overdrag cyklen og markér annoncen som solgt. Så nemt er det.</p>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="openModal()" style="margin-top:32px;">Sælg din cykel gratis →</button>
+  </section>
 
   <!-- ── MAIN: SIDEBAR + ANNONCER ── -->
   <div class="main">
