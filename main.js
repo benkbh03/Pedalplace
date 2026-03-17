@@ -58,6 +58,9 @@ async function init() {
   document.getElementById('dealer-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeBecomeDealerModal();
   });
+  document.getElementById('footer-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeFooterModal();
+  });
 }
 
 function updateNav(loggedIn, name) {
@@ -1503,3 +1506,114 @@ window.closeInboxModal  = closeInboxModal;
 window.openInboxThread  = openInboxThread;
 window.closeInboxThread = closeInboxThread;
 window.sendInboxReply   = sendInboxReply;
+
+/* ============================================================
+   FOOTER MODALER
+   ============================================================ */
+
+var footerContent = {
+  terms: {
+    title: 'Vilkår og betingelser',
+    body: `
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">1. Generelt</h3>
+      <p style="margin-bottom:16px;">Disse vilkår gælder for alle brugere af Cykelbørsen. Ved at benytte platformen accepterer du nedenstående betingelser. Cykelbørsen er en formidlingsplatform mellem køber og sælger — vi er ikke part i selve handlen.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">2. Oprettelse af annonce</h3>
+      <p style="margin-bottom:16px;">Det er gratis at oprette annoncer på Cykelbørsen. Du er selv ansvarlig for at dine annoncer er korrekte og ikke krænker andres rettigheder. Vildledende eller falske annoncer vil blive slettet uden varsel.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">3. Handel og betaling</h3>
+      <p style="margin-bottom:16px;">Cykelbørsen formidler kontakt mellem køber og sælger men er ikke ansvarlig for gennemførelsen af handlen, betaling eller levering. Vi anbefaler altid at mødes på et offentligt sted og inspicere cyklen inden køb.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">4. Misbrug og rapportering</h3>
+      <p style="margin-bottom:16px;">Svindel, spam eller chikane tolereres ikke. Mistænkelige annoncer kan rapporteres via kontaktformularen. Vi forbeholder os ret til at slette konti der misbruger platformen.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">5. Ansvarsbegrænsning</h3>
+      <p>Cykelbørsen er ikke ansvarlig for tab opstået i forbindelse med handler formidlet via platformen. Vi garanterer ikke for ægtheden af annoncer eller brugeres identitet.</p>
+    `
+  },
+  privacy: {
+    title: 'Privatlivspolitik',
+    body: `
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">Hvilke data indsamler vi?</h3>
+      <p style="margin-bottom:16px;">Når du opretter en konto indsamler vi dit navn, e-mail og eventuelle profiloplysninger du selv vælger at tilføje. Annoncedata som beskrivelser, billeder og priser gemmes i vores database.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">Hvordan bruger vi dine data?</h3>
+      <p style="margin-bottom:16px;">Dine data bruges udelukkende til at drive platformen — herunder at vise dine annoncer, sende beskeder og forbedre brugeroplevelsen. Vi sælger aldrig dine data til tredjepart.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">Cookies</h3>
+      <p style="margin-bottom:16px;">Vi bruger tekniske cookies der er nødvendige for at siden fungerer korrekt, herunder at holde dig logget ind. Vi bruger ikke tracking-cookies til reklameformål.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">Dine rettigheder</h3>
+      <p style="margin-bottom:16px;">Du har ret til indsigt i, rettelse af og sletning af dine persondata. Kontakt os på kontakt@cykelborsen.dk for at udøve dine rettigheder.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-bottom:8px;">Kontakt</h3>
+      <p>Spørgsmål om privatlivspolitikken kan rettes til: <strong>kontakt@cykelborsen.dk</strong></p>
+    `
+  },
+  contact: {
+    title: 'Kontakt os',
+    body: `
+      <p style="margin-bottom:22px;color:#8A8578;">Har du spørgsmål, oplever du problemer eller vil du rapportere en annonce? Vi svarer inden for 1-2 hverdage.</p>
+
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--sand);border-radius:10px;border:1px solid var(--border);">
+          <span style="font-size:1.4rem;">📧</span>
+          <div>
+            <div style="font-weight:600;font-size:0.88rem;">E-mail</div>
+            <div style="color:var(--muted);font-size:0.85rem;">kontakt@cykelborsen.dk</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--sand);border-radius:10px;border:1px solid var(--border);">
+          <span style="font-size:1.4rem;">⏱️</span>
+          <div>
+            <div style="font-weight:600;font-size:0.88rem;">Svartid</div>
+            <div style="color:var(--muted);font-size:0.85rem;">Hverdage kl. 9–17</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:0.82rem;font-weight:600;">Dit navn</label>
+          <input type="text" id="contact-name" placeholder="Dit fulde navn" style="padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--cream);outline:none;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:0.82rem;font-weight:600;">E-mail</label>
+          <input type="email" id="contact-email" placeholder="din@email.dk" style="padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--cream);outline:none;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:0.82rem;font-weight:600;">Besked</label>
+          <textarea id="contact-message" placeholder="Beskriv dit spørgsmål eller problem..." style="padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--cream);outline:none;resize:vertical;min-height:100px;"></textarea>
+        </div>
+        <button onclick="submitContactForm()" style="background:var(--rust);color:#fff;border:none;padding:14px;border-radius:8px;font-size:0.92rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px;">Send besked</button>
+      </div>
+    `
+  }
+};
+
+function openFooterModal(type) {
+  var data = footerContent[type];
+  if (!data) return;
+  document.getElementById('footer-modal-title').textContent = data.title;
+  document.getElementById('footer-modal-body').innerHTML = data.body;
+  document.getElementById('footer-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFooterModal() {
+  document.getElementById('footer-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function submitContactForm() {
+  var name    = document.getElementById('contact-name').value.trim();
+  var email   = document.getElementById('contact-email').value.trim();
+  var message = document.getElementById('contact-message').value.trim();
+  if (!name || !email || !message) { showToast('⚠️ Udfyld alle felter'); return; }
+  closeFooterModal();
+  showToast('✅ Tak! Vi vender tilbage inden for 1-2 hverdage.');
+}
+
+window.openFooterModal    = openFooterModal;
+window.closeFooterModal   = closeFooterModal;
+window.submitContactForm  = submitContactForm;
