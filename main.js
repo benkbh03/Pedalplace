@@ -29,6 +29,11 @@ async function init() {
 
     updateNav(true, profile?.name);
     startRealtimeNotifications();
+    // Vis admin knap hvis admin
+    if (profile && profile.is_admin) {
+      var adminBtn = document.getElementById('nav-admin');
+      if (adminBtn) adminBtn.style.display = 'flex';
+    }
   } else {
     updateNav(false);
   }
@@ -60,6 +65,9 @@ async function init() {
   });
   document.getElementById('footer-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeFooterModal();
+  });
+  document.getElementById('admin-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeAdminPanel();
   });
 }
 
@@ -163,7 +171,7 @@ function renderBikes(bikes) {
             <div class="seller-info">
               <div class="seller-avatar">${initials}</div>
               <div>
-                <div class="seller-name">${sellerName || 'Ukendt'}</div>
+                <div class="seller-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge" title="Verificeret forhandler">✓</span>' : ''}</div>
                 <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
                   ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
                 </span>
@@ -562,6 +570,8 @@ async function logout() {
   currentUser    = null;
   currentProfile = null;
   closeProfileModal();
+  var adminBtn = document.getElementById('nav-admin');
+  if (adminBtn) adminBtn.style.display = 'none';
   showToast('👋 Du er logget ud');
 }
 
@@ -632,7 +642,7 @@ async function openBikeModal(bikeId) {
         <div class="bike-detail-seller">
           <div class="seller-avatar-large">${initials}</div>
           <div>
-            <div class="seller-detail-name">${sellerName || 'Ukendt'}</div>
+            <div class="seller-detail-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge-large" title="Verificeret forhandler">✓</span>' : ''}</div>
             <div class="seller-detail-city">${profile.city || ''}</div>
             <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
               ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
@@ -1616,3 +1626,123 @@ function submitContactForm() {
   closeFooterModal();
   showToast('✅ Tak! Vi vender tilbage inden for 1-2 hverdage.');
 }
+
+
+/* ============================================================
+   ADMIN PANEL
+   ============================================================ */
+
+async function openAdminPanel() {
+  document.getElementById('admin-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  switchAdminTab('applications');
+}
+
+function closeAdminPanel() {
+  document.getElementById('admin-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function switchAdminTab(tab) {
+  document.getElementById('admin-applications').style.display = tab === 'applications' ? 'block' : 'none';
+  document.getElementById('admin-users').style.display        = tab === 'users'        ? 'block' : 'none';
+  document.getElementById('atab-applications').classList.toggle('active', tab === 'applications');
+  document.getElementById('atab-users').classList.toggle('active', tab === 'users');
+  if (tab === 'applications') loadDealerApplications();
+  if (tab === 'users')        loadAllUsers();
+}
+
+async function loadDealerApplications() {
+  var list = document.getElementById('admin-applications-list');
+  list.innerHTML = '<p style="color:var(--muted)">Henter ansøgninger...</p>';
+
+  var result = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('seller_type', 'dealer')
+    .eq('verified', false)
+    .order('created_at', { ascending: false });
+
+  if (!result.data || result.data.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Ingen ventende ansøgninger.</p>';
+    return;
+  }
+
+  list.innerHTML = result.data.map(function(p) {
+    return '<div class="admin-row">'
+      + '<div class="admin-row-info">'
+      + '<div class="admin-row-name">' + (p.shop_name || p.name) + '</div>'
+      + '<div class="admin-row-meta">'
+      + (p.name ? p.name + ' · ' : '')
+      + (p.email || '') + (p.cvr ? ' · CVR: ' + p.cvr : '')
+      + (p.city ? ' · ' + p.city : '') + '</div>'
+      + '</div>'
+      + '<div class="admin-row-actions">'
+      + '<button class="btn-approve" onclick="approveDealer(\'' + p.id + '\')">✓ Godkend</button>'
+      + '<button class="btn-reject" onclick="rejectDealer(\'' + p.id + '\')">✕ Afvis</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+async function loadAllUsers() {
+  var list = document.getElementById('admin-users-list');
+  list.innerHTML = '<p style="color:var(--muted)">Henter brugere...</p>';
+
+  var result = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (!result.data || result.data.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Ingen brugere fundet.</p>';
+    return;
+  }
+
+  list.innerHTML = result.data.map(function(p) {
+    var isVerified = p.verified;
+    var isDealer   = p.seller_type === 'dealer';
+    return '<div class="admin-row">'
+      + '<div class="admin-row-info">'
+      + '<div class="admin-row-name">'
+      + (p.name || 'Ukendt')
+      + (isVerified ? ' <span class="verified-badge">✓</span>' : '')
+      + '</div>'
+      + '<div class="admin-row-meta">' + (p.email || '') + ' · ' + (isDealer ? '🏪 Forhandler' : '👤 Privat') + '</div>'
+      + '</div>'
+      + '<div class="admin-row-actions">'
+      + (isDealer && !isVerified ? '<button class="btn-approve" onclick="approveDealer(\'' + p.id + '\')">✓ Verificer</button>' : '')
+      + (isVerified ? '<button class="btn-reject" onclick="revokeDealer(\'' + p.id + '\')">Fjern verificering</button>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+async function approveDealer(userId) {
+  var err = (await supabase.from('profiles').update({ verified: true }).eq('id', userId)).error;
+  if (err) { showToast('❌ Kunne ikke godkende forhandler'); return; }
+  showToast('✅ Forhandler godkendt og verificeret!');
+  loadDealerApplications();
+  loadAllUsers();
+}
+
+async function rejectDealer(userId) {
+  if (!confirm('Afvis denne ansøgning og fjern forhandlerstatus?')) return;
+  var err = (await supabase.from('profiles').update({ seller_type: 'private', verified: false }).eq('id', userId)).error;
+  if (err) { showToast('❌ Kunne ikke afvise'); return; }
+  showToast('🗑️ Ansøgning afvist');
+  loadDealerApplications();
+}
+
+async function revokeDealer(userId) {
+  if (!confirm('Fjern verificering fra denne forhandler?')) return;
+  var err = (await supabase.from('profiles').update({ verified: false }).eq('id', userId)).error;
+  if (err) { showToast('❌ Fejl'); return; }
+  showToast('Verificering fjernet');
+  loadAllUsers();
+}
+
+window.openAdminPanel       = openAdminPanel;
+window.closeAdminPanel      = closeAdminPanel;
+window.switchAdminTab       = switchAdminTab;
+window.approveDealer        = approveDealer;
+window.rejectDealer         = rejectDealer;
+window.revokeDealer         = revokeDealer;
