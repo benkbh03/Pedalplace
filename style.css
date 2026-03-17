@@ -382,7 +382,7 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 /* ── MODALER ── */
 .modal-overlay {
   display: none; position: fixed; inset: 0;
-  background: rgba(26,26,24,0.55); z-index: 200;
+  background: rgba(26,26,24,0.55); z-index: 1500;
   align-items: center; justify-content: center;
   padding: 24px; backdrop-filter: blur(3px);
 }
