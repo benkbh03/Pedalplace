@@ -1948,3 +1948,206 @@ window.closeShareModal    = closeShareModal;
 window.copyShareLink      = copyShareLink;
 window.shareViaSMS        = shareViaSMS;
 window.openNativeShare     = openNativeShare;
+
+/* ============================================================
+   KORTVISNING MED LEAFLET
+   ============================================================ */
+
+var mapInstance       = null;
+window._getMap = function() { return mapInstance; };
+var mapMarkers        = [];
+var currentView       = 'list';
+var userLocationMarker = null;
+
+function setView(view) {
+  currentView = view;
+  var listGrid  = document.getElementById('listings-grid');
+  var mapDiv    = document.getElementById('listings-map');
+  var btnList   = document.getElementById('btn-list-view');
+  var btnMap    = document.getElementById('btn-map-view');
+
+  if (view === 'map') {
+    listGrid.style.display = 'none';
+    mapDiv.style.display   = 'block';
+    btnList.classList.remove('active');
+    btnMap.classList.add('active');
+    initMap();
+  } else {
+    listGrid.style.display = '';
+    mapDiv.style.display   = 'none';
+    btnMap.classList.remove('active');
+    btnList.classList.add('active');
+  }
+}
+
+async function initMap() {
+  // Initialiser kort første gang
+  if (!mapInstance) {
+    mapInstance = L.map('listings-map', { zoomControl: true }).setView([56.0, 10.0], 7);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(mapInstance);
+
+    // Tilføj "Find mig" knap
+    var locateBtn = document.createElement('button');
+    locateBtn.className   = 'locate-btn';
+    locateBtn.textContent = '📍 Find mig';
+    locateBtn.onclick     = locateUser;
+    document.getElementById('listings-map').appendChild(locateBtn);
+  }
+
+  // Ryd gamle markører
+  mapMarkers.forEach(function(m) { mapInstance.removeLayer(m); });
+  mapMarkers = [];
+
+  // Hent annoncer med by
+  var result = await supabase
+    .from('bikes')
+    .select('*, profiles(name, seller_type, shop_name, verified)')
+    .eq('is_active', true);
+
+  if (!result.data || result.data.length === 0) return;
+
+  // Geokod byer og sæt markører
+  var cityCoords = {
+    'København':    [55.6761, 12.5683],
+    'Kbh':          [55.6761, 12.5683],
+    'Aarhus':       [56.1629, 10.2039],
+    'Odense':       [55.4038, 10.4024],
+    'Aalborg':      [57.0488, 9.9217],
+    'Esbjerg':      [55.4761, 8.4594],
+    'Randers':      [56.4607, 10.0360],
+    'Horsens':      [55.8609, 9.8509],
+    'Kolding':      [55.4904, 9.4722],
+    'Vejle':        [55.7096, 9.5360],
+    'Roskilde':     [55.6415, 12.0803],
+    'Helsingør':    [56.0363, 12.6136],
+    'Fredericia':   [55.5651, 9.7522],
+    'Silkeborg':    [56.1720, 9.5517],
+    'Herning':      [56.1372, 8.9727],
+    'Holstebro':    [56.3601, 8.6177],
+    'Slagelse':     [55.4022, 11.3546],
+    'Næstved':      [55.2307, 11.7600],
+    'Viborg':       [56.4532, 9.4022],
+    'Frederiksberg':[55.6800, 12.5200],
+    'Hvidovre':     [55.6513, 12.4743],
+    'Glostrup':     [55.6667, 12.4000],
+    'Lyngby':       [55.7700, 12.5000],
+    'Hillerød':     [55.9293, 12.3101],
+    'Køge':         [55.4570, 12.1784],
+    'Greve':        [55.5908, 12.3000],
+    'Ballerup':     [55.7300, 12.3600],
+    'Herlev':       [55.7300, 12.4400],
+  };
+
+  result.data.forEach(function(b) {
+    if (!b.city) return;
+
+    // Find koordinater — prøv direkte match og delvist match
+    var coords = null;
+    var cityLower = b.city.toLowerCase();
+    for (var key in cityCoords) {
+      if (cityLower.includes(key.toLowerCase()) || key.toLowerCase().includes(cityLower)) {
+        coords = cityCoords[key];
+        break;
+      }
+    }
+    if (!coords) return; // Spring over hvis by ikke kendes
+
+    // Tilføj lille tilfældig offset så markører ikke overlapper
+    var lat = coords[0] + (Math.random() - 0.5) * 0.01;
+    var lng = coords[1] + (Math.random() - 0.5) * 0.01;
+
+    var profile    = b.profiles || {};
+    var sellerType = profile.seller_type || 'private';
+    var sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
+    var isVerified = profile.verified;
+    var isDealer   = sellerType === 'dealer';
+
+    // Farvet markør
+    var color  = isDealer ? '#2A3D2E' : '#C8502A';
+    var icon = L.divIcon({
+      html: '<div style="background:' + color + ';color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">'
+          + (isDealer ? '🏪' : '🚲') + '</div>',
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    var marker = L.marker([lat, lng], { icon: icon }).addTo(mapInstance);
+
+    // Popup indhold
+    var popupHtml = '<div class="map-popup">'
+      + '<div class="map-popup-title">' + b.brand + ' ' + b.model
+      + (isVerified ? ' <span style="background:#2A7D4F;color:white;border-radius:50%;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;font-size:0.55rem;margin-left:4px;">✓</span>' : '')
+      + '</div>'
+      + '<div class="map-popup-price">' + b.price.toLocaleString('da-DK') + ' kr.</div>'
+      + '<div class="map-popup-meta">' + b.type + ' · ' + b.condition + ' · ' + (sellerName || 'Ukendt')
+      + ' <span style="background:' + (isDealer ? '#E8F0E8' : '#FBF0E8') + ';color:' + (isDealer ? '#2A3D2E' : '#8A4A20') + ';padding:2px 7px;border-radius:100px;font-size:.7rem;">'
+      + (isDealer ? '🏪 Forhandler' : '👤 Privat') + '</span></div>'
+      + '<button class="map-popup-btn" onclick="window._getMap().closePopup();openBikeModal(\'' + b.id + '\')">Se annonce →</button>'
+      + '</div>';
+
+    marker.bindPopup(popupHtml, { maxWidth: 280, closeButton: false });
+
+    marker.on('click', function() { marker.openPopup(); });
+
+    mapMarkers.push(marker);
+  });
+
+  // Zoom til markørerne hvis der er nogen
+  if (mapMarkers.length > 0) {
+    var group = L.featureGroup(mapMarkers);
+    mapInstance.fitBounds(group.getBounds().pad(0.1));
+  }
+
+  // Tilføj legende
+  if (!document.getElementById('map-legend')) {
+    var legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = function() {
+      var div = L.DomUtil.create('div');
+      div.id  = 'map-legend';
+      div.style.cssText = 'background:white;padding:10px 14px;border-radius:8px;font-family:DM Sans,sans-serif;font-size:.78rem;box-shadow:0 2px 8px rgba(0,0,0,.1);';
+      div.innerHTML = '<div style="margin-bottom:6px;font-weight:600;">Forklaring</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><div style="background:#C8502A;border-radius:50%;width:16px;height:16px;border:2px solid white;"></div> Privat sælger</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;"><div style="background:#2A3D2E;border-radius:50%;width:16px;height:16px;border:2px solid white;"></div> Forhandler</div>';
+      return div;
+    };
+    legend.addTo(mapInstance);
+  }
+
+  // Trigger resize så kortet fylder korrekt
+  setTimeout(function() { mapInstance.invalidateSize(); }, 100);
+}
+
+function locateUser() {
+  if (!navigator.geolocation) { showToast('⚠️ Din browser understøtter ikke lokation'); return; }
+
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude;
+    var lng = pos.coords.longitude;
+
+    if (userLocationMarker) mapInstance.removeLayer(userLocationMarker);
+
+    var userIcon = L.divIcon({
+      html: '<div style="background:#1877F2;border-radius:50%;width:16px;height:16px;border:3px solid white;box-shadow:0 0 0 3px rgba(24,119,242,0.3);"></div>',
+      className: '', iconSize: [16, 16], iconAnchor: [8, 8],
+    });
+
+    userLocationMarker = L.marker([lat, lng], { icon: userIcon })
+      .addTo(mapInstance)
+      .bindPopup('<div style="padding:8px;font-family:DM Sans,sans-serif;font-size:.85rem;font-weight:600;">📍 Din placering</div>')
+      .openPopup();
+
+    mapInstance.setView([lat, lng], 12);
+    showToast('📍 Viser cykler nær dig');
+  }, function() {
+    showToast('⚠️ Kunne ikke hente din lokation');
+  });
+}
+
+window.setView    = setView;
+window.locateUser = locateUser;
+window.openBikeModal = openBikeModal; // allerede defineret
