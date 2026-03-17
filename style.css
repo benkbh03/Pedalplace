@@ -721,3 +721,118 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   display: flex; align-items: center; justify-content: center;
   font-size: 0.55rem; color: #fff;
 }
+
+/* ── AUTOCOMPLETE ── */
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--cream);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 150;
+  overflow: hidden;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.autocomplete-item {
+  padding: 11px 16px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--border);
+}
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover, .autocomplete-item.active { background: var(--sand); }
+.autocomplete-item strong { color: var(--rust); }
+.autocomplete-meta { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+
+/* ── DEL ANNONCE ── */
+.share-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1.5px solid var(--border);
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  color: var(--charcoal);
+  background: var(--sand);
+}
+.share-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.share-icon { font-size: 1.6rem; }
+.share-whatsapp:hover { border-color: #25D366; background: #f0fdf4; color: #16a34a; }
+.share-facebook:hover { border-color: #1877F2; background: #eff6ff; color: #1877F2; }
+.share-link:hover     { border-color: var(--forest); background: #f0f4f0; color: var(--forest); }
+.share-sms:hover      { border-color: var(--rust); background: #fff7f5; color: var(--rust); }
+
+.share-link-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--sand);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 4px 4px 14px;
+}
+.share-link-box input {
+  flex: 1; border: none; background: transparent;
+  font-size: 0.82rem; color: var(--muted);
+  font-family: 'DM Sans', sans-serif; outline: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.share-link-box button {
+  background: var(--forest); color: var(--sand);
+  border: none; border-radius: 6px; padding: 8px 16px;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  white-space: nowrap;
+}
+.share-link-box button:hover { background: var(--forest-light); }
+
+/* ── SÆT SOM SOLGT ── */
+.sold-tag {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(26,26,24,0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2; border-radius: 0;
+}
+.sold-tag span {
+  background: var(--charcoal); color: #fff;
+  font-family: 'Fraunces', serif; font-size: 1.1rem;
+  font-weight: 700; padding: 8px 20px; border-radius: 6px;
+  transform: rotate(-5deg);
+}
+.btn-sold {
+  background: var(--charcoal); color: var(--sand);
+  border: none; border-radius: 6px; padding: 6px 12px;
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-sold:hover { background: #333; }
+.btn-unsold {
+  background: var(--forest); color: var(--sand);
+  border: none; border-radius: 6px; padding: 6px 12px;
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-unsold:hover { background: var(--forest-light); }
