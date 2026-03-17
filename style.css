@@ -887,3 +887,71 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   .how-step-arrow { display: none; }
   .how-step { min-width: 140px; }
 }
+
+/* ── KORTVISNING ── */
+.view-toggle {
+  background: var(--sand);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  width: 38px; height: 38px;
+  cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.view-toggle:hover      { border-color: var(--forest); }
+.view-toggle.active     { background: var(--forest); border-color: var(--forest); color: white; }
+
+/* Leaflet popup override */
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+  min-width: 220px !important;
+}
+.map-popup {
+  padding: 14px 16px;
+}
+.map-popup-title {
+  font-family: 'Fraunces', serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.map-popup-price {
+  color: var(--rust);
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  font-size: 1.1rem;
+  margin-bottom: 6px;
+}
+.map-popup-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
+.map-popup-btn {
+  background: var(--forest); color: var(--sand);
+  border: none; border-radius: 6px; padding: 8px 14px;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; width: 100%;
+  transition: background 0.15s;
+}
+.map-popup-btn:hover { background: var(--forest-light); }
+
+/* Bruger lokation knap */
+.locate-btn {
+  position: absolute;
+  bottom: 16px; right: 16px;
+  z-index: 1000;
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.15s;
+}
+.locate-btn:hover { border-color: var(--forest); }
