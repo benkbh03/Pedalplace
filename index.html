@@ -705,28 +705,21 @@
         <button class="modal-close" onclick="closeShareModal()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="share-buttons">
-          <button class="share-btn share-link" onclick="copyShareLink()">
-            <span class="share-icon">🔗</span>
-            <span>Kopier link</span>
-          </button>
-          <a class="share-btn share-whatsapp" id="share-whatsapp-btn" href="#" target="_blank">
-            <span class="share-icon">💬</span>
-            <span>Del på WhatsApp</span>
-          </a>
-          <a class="share-btn share-facebook" id="share-facebook-btn" href="#" target="_blank">
-            <span class="share-icon">📘</span>
-            <span>Del på Facebook</span>
-          </a>
-          <button class="share-btn share-sms" onclick="shareViaSMS()">
-            <span class="share-icon">📱</span>
-            <span>Send som SMS</span>
-          </button>
-        </div>
-        <div class="share-link-box">
+        <div class="share-link-box" style="margin-bottom:16px;">
           <input type="text" id="share-link-input" readonly>
           <button onclick="copyShareLink()">Kopiér</button>
         </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="share-btn share-link" onclick="copyShareLink()" style="flex-direction:row;justify-content:center;gap:10px;padding:14px;">
+            <span>🔗</span><span>Kopier link</span>
+          </button>
+          <button class="share-btn" onclick="openNativeShare()" style="flex-direction:row;justify-content:center;gap:10px;padding:14px;background:var(--forest);color:var(--sand);border-color:var(--forest);">
+            <span>↗️</span><span>Del via sociale medier</span>
+          </button>
+        </div>
+        <!-- Skjult til brug -->
+        <a id="share-whatsapp-btn" href="#" target="_blank" style="display:none;"></a>
+        <a id="share-facebook-btn" href="#" target="_blank" style="display:none;"></a>
       </div>
     </div>
   </div>
