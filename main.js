@@ -181,7 +181,7 @@ function renderBikes(bikes) {
             <div class="seller-info">
               <div class="seller-avatar">${initials}</div>
               <div>
-                <div class="seller-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge" title="Verificeret forhandler">✓</span>' : ''}</div>
+                <div class="seller-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge" title="Verificeret forhandler">✓</span>' : ''}${profile.id_verified ? ' <span class="id-badge" title="ID verificeret">🪪</span>' : ''}</div>
                 <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
                   ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
                 </span>
@@ -494,6 +494,7 @@ function showProfileData() {
   document.getElementById('edit-seller-type').onchange = function () {
     shopGroup.style.display = this.value === 'dealer' ? 'flex' : 'none';
   };
+  updateIdVerifyUI();
 }
 
 function switchProfileTab(tab) {
@@ -675,7 +676,7 @@ async function openBikeModal(bikeId) {
         <div class="bike-detail-seller">
           <div class="seller-avatar-large">${initials}</div>
           <div>
-            <div class="seller-detail-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge-large" title="Verificeret forhandler">✓</span>' : ''}</div>
+            <div class="seller-detail-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge-large" title="Verificeret forhandler">✓</span>' : ''}${profile.id_verified ? ' <span class="id-badge" title="ID verificeret">🪪</span>' : ''}</div>
             <div class="seller-detail-city">${profile.city || ''}</div>
             <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
               ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
@@ -1680,10 +1681,13 @@ function closeAdminPanel() {
 function switchAdminTab(tab) {
   document.getElementById('admin-applications').style.display = tab === 'applications' ? 'block' : 'none';
   document.getElementById('admin-users').style.display        = tab === 'users'        ? 'block' : 'none';
+  document.getElementById('admin-id').style.display           = tab === 'id'           ? 'block' : 'none';
   document.getElementById('atab-applications').classList.toggle('active', tab === 'applications');
   document.getElementById('atab-users').classList.toggle('active', tab === 'users');
+  document.getElementById('atab-id').classList.toggle('active', tab === 'id');
   if (tab === 'applications') loadDealerApplications();
   if (tab === 'users')        loadAllUsers();
+  if (tab === 'id')           loadIdApplications();
 }
 
 async function loadDealerApplications() {
@@ -2166,3 +2170,159 @@ window._openFromMap = _openFromMap;
 window.setView    = setView;
 window.locateUser = locateUser;
 window.openBikeModal = openBikeModal; // allerede defineret
+
+/* ============================================================
+   ID VERIFICERING
+   ============================================================ */
+
+var idDocFile = null;
+
+function previewIdDoc(input) {
+  if (!input.files || !input.files[0]) return;
+  idDocFile = input.files[0];
+
+  var label = document.getElementById('id-upload-label');
+  if (label) label.textContent = idDocFile.name;
+
+  // Vis preview hvis billede
+  if (idDocFile.type.startsWith('image/')) {
+    var preview = document.getElementById('id-preview');
+    var img     = document.getElementById('id-preview-img');
+    if (preview && img) {
+      img.src = URL.createObjectURL(idDocFile);
+      preview.style.display = 'block';
+    }
+  }
+
+  var submitBtn = document.getElementById('id-submit-btn');
+  if (submitBtn) submitBtn.style.display = 'block';
+}
+
+async function submitIdVerification() {
+  if (!currentUser || !idDocFile) { showToast('⚠️ Vælg et dokument først'); return; }
+
+  showToast('⏳ Uploader dokument...');
+
+  var ext      = idDocFile.name.split('.').pop();
+  var filename = 'id-docs/' + currentUser.id + '/id-' + Date.now() + '.' + ext;
+
+  var uploadResult = await supabase.storage
+    .from('bike-images')
+    .upload(filename, idDocFile, { contentType: idDocFile.type, upsert: true });
+
+  if (uploadResult.error) {
+    showToast('❌ Upload fejlede — prøv igen');
+    console.error(uploadResult.error);
+    return;
+  }
+
+  var publicUrl = supabase.storage.from('bike-images').getPublicUrl(filename).data.publicUrl;
+
+  // Gem URL og status i profil
+  var updateResult = await supabase.from('profiles').update({
+    id_doc_url:    publicUrl,
+    id_verified:   false,
+    id_pending:    true,
+  }).eq('id', currentUser.id);
+
+  if (updateResult.error) {
+    showToast('❌ Noget gik galt — prøv igen');
+    return;
+  }
+
+  // Opdater UI
+  document.getElementById('id-verify-upload-section').style.display = 'none';
+  document.getElementById('id-verify-pending').style.display        = 'block';
+  var statusEl = document.getElementById('id-verify-status');
+  if (statusEl) { statusEl.textContent = '⏳ Afventer'; statusEl.className = 'id-status-waiting'; }
+
+  currentProfile = { ...currentProfile, id_pending: true, id_doc_url: publicUrl };
+  showToast('✅ Dokument sendt til verificering!');
+}
+
+function updateIdVerifyUI() {
+  var profile = currentProfile || {};
+  var box     = document.getElementById('id-verify-box');
+  if (!box) return;
+
+  var statusEl     = document.getElementById('id-verify-status');
+  var uploadSection = document.getElementById('id-verify-upload-section');
+  var pendingSection = document.getElementById('id-verify-pending');
+
+  if (profile.id_verified) {
+    if (statusEl) { statusEl.textContent = '✓ Verificeret'; statusEl.className = 'id-status-verified'; }
+    if (uploadSection)  uploadSection.style.display  = 'none';
+    if (pendingSection) pendingSection.style.display = 'none';
+    // Vis bekræftelse
+    var done = document.createElement('p');
+    done.style.cssText = 'font-size:.85rem;color:#2A7D4F;background:#E8F0E8;padding:12px 16px;border-radius:8px;';
+    done.textContent   = '✓ Din identitet er bekræftet. Du optræder med et blåt ID-badge på dine annoncer.';
+    box.appendChild(done);
+  } else if (profile.id_pending) {
+    if (statusEl) { statusEl.textContent = '⏳ Afventer'; statusEl.className = 'id-status-waiting'; }
+    if (uploadSection)  uploadSection.style.display  = 'none';
+    if (pendingSection) pendingSection.style.display = 'block';
+  } else {
+    if (statusEl) { statusEl.textContent = 'Ikke verificeret'; statusEl.className = 'id-status-pending'; }
+  }
+}
+
+// Tilføj ID badge på annoncekort
+// (kaldes fra renderBikes via profile.id_verified check)
+
+/* ── ADMIN: ID ANSØGNINGER ── */
+
+async function loadIdApplications() {
+  var list = document.getElementById('admin-id-list');
+  list.innerHTML = '<p style="color:var(--muted)">Henter ansøgninger...</p>';
+
+  var result = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id_pending', true)
+    .eq('id_verified', false);
+
+  if (!result.data || result.data.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted)">Ingen ventende ID-ansøgninger.</p>';
+    return;
+  }
+
+  list.innerHTML = result.data.map(function(p) {
+    return '<div class="admin-row">'
+      + '<img class="admin-id-img" src="' + (p.id_doc_url || '') + '" onclick="window.open(\'' + (p.id_doc_url || '') + '\',\'_blank\')" title="Klik for at se fuldt billede">'
+      + '<div class="admin-row-info">'
+      + '<div class="admin-row-name">' + (p.name || 'Ukendt') + '</div>'
+      + '<div class="admin-row-meta">' + (p.email || '') + ' · ' + (p.seller_type === 'dealer' ? '🏪 Forhandler' : '👤 Privat') + '</div>'
+      + '</div>'
+      + '<div class="admin-row-actions">'
+      + '<button class="btn-approve" onclick="approveId(\'' + p.id + '\')">✓ Godkend ID</button>'
+      + '<button class="btn-reject" onclick="rejectId(\'' + p.id + '\')">✕ Afvis</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+async function approveId(userId) {
+  var err = (await supabase.from('profiles').update({
+    id_verified: true,
+    id_pending:  false,
+  }).eq('id', userId)).error;
+  if (err) { showToast('❌ Fejl'); return; }
+  showToast('✅ ID godkendt — bruger har nu et blåt badge');
+  loadIdApplications();
+}
+
+async function rejectId(userId) {
+  if (!confirm('Afvis denne ID-ansøgning?')) return;
+  var err = (await supabase.from('profiles').update({
+    id_pending:  false,
+    id_doc_url:  null,
+  }).eq('id', userId)).error;
+  if (err) { showToast('❌ Fejl'); return; }
+  showToast('ID-ansøgning afvist');
+  loadIdApplications();
+}
+
+window.previewIdDoc       = previewIdDoc;
+window.submitIdVerification = submitIdVerification;
+window.approveId          = approveId;
+window.rejectId           = rejectId;
