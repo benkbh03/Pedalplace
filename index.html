@@ -427,6 +427,39 @@
             </div>
           </div>
           <button class="form-submit" onclick="saveProfile()">Gem ændringer</button>
+
+          <!-- ID Verificering -->
+          <div class="id-verify-box" id="id-verify-box">
+            <div class="id-verify-header">
+              <div>
+                <div class="id-verify-title">🪪 ID-verificering</div>
+                <div class="id-verify-sub">Bliv verificeret og optræd med et ✓ badge på dine annoncer</div>
+              </div>
+              <span id="id-verify-status" class="id-status-pending">Ikke verificeret</span>
+            </div>
+            <div id="id-verify-upload-section">
+              <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+                Upload et billede af dit pas, kørekort eller NemID. Billedet behandles fortroligt og bruges kun til at bekræfte din identitet.
+              </p>
+              <div class="img-upload" onclick="document.getElementById('id-doc-input').click()" id="id-upload-area">
+                <div class="upload-icon">🪪</div>
+                <p id="id-upload-label">Klik for at uploade ID-dokument</p>
+              </div>
+              <input type="file" id="id-doc-input" accept="image/*,.pdf" style="display:none" onchange="previewIdDoc(this)">
+              <div id="id-preview" style="display:none;margin-top:10px;">
+                <img id="id-preview-img" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border);">
+              </div>
+              <button class="form-submit" onclick="submitIdVerification()" id="id-submit-btn" style="display:none;margin-top:12px;">
+                Send til verificering
+              </button>
+            </div>
+            <div id="id-verify-pending" style="display:none;">
+              <p style="font-size:.85rem;color:var(--muted);background:var(--sand);padding:12px 16px;border-radius:8px;border:1px solid var(--border);">
+                ⏳ Din ansøgning er modtaget og behandles inden for 1-2 hverdage.
+              </p>
+            </div>
+          </div>
+
           <button class="btn-logout" onclick="logout()">Log ud</button>
         </div>
 
@@ -662,6 +695,7 @@
         <div class="profile-tabs" style="margin-bottom:20px;">
           <button class="profile-tab active" id="atab-applications" onclick="switchAdminTab('applications')">Forhandler ansøgninger</button>
           <button class="profile-tab" id="atab-users" onclick="switchAdminTab('users')">Alle brugere</button>
+          <button class="profile-tab" id="atab-id" onclick="switchAdminTab('id')">ID ansøgninger</button>
         </div>
         <div id="admin-applications">
           <div id="admin-applications-list">
@@ -670,6 +704,11 @@
         </div>
         <div id="admin-users" style="display:none;">
           <div id="admin-users-list">
+            <p style="color:var(--muted)">Indlæser...</p>
+          </div>
+        </div>
+        <div id="admin-id" style="display:none;">
+          <div id="admin-id-list">
             <p style="color:var(--muted)">Indlæser...</p>
           </div>
         </div>
