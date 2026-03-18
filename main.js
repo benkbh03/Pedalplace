@@ -733,6 +733,9 @@ async function openBikeModal(bikeId) {
       <div class="bike-detail-description">${b.description}</div>
     </div>` : ''}
   `;
+
+  // Tilknyt swipe-navigation på mobil
+  attachGallerySwipe();
 }
 
 function closeBikeModal() {
@@ -766,6 +769,20 @@ function galleryGoto(index) {
 
 function galleryNav(dir) {
   galleryGoto((window._galleryIndex || 0) + dir);
+}
+
+function attachGallerySwipe() {
+  const mainEl = document.querySelector('.gallery-main');
+  if (!mainEl || mainEl._swipeAttached) return;
+  mainEl._swipeAttached = true;
+  let startX = 0;
+  mainEl.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+  }, { passive: true });
+  mainEl.addEventListener('touchend', (e) => {
+    const diff = startX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) galleryNav(diff > 0 ? 1 : -1);
+  }, { passive: true });
 }
 
 window.galleryNav  = galleryNav;

@@ -24,9 +24,9 @@ BEGIN
   -- Edge Function URL (skift hvis dit projekt-ref er anderledes)
   v_url := 'https://ktufgncydxhkhfttojkh.supabase.co/functions/v1/notify-message';
 
-  -- Brug anon key til at kalde Edge Function
+  -- Brug anon key til at kalde Edge Function (hardcodet publishable key)
   -- Edge Functionen bruger service role key internt til at hente data
-  v_key := current_setting('app.settings.anon_key', true);
+  v_key := 'sb_publishable_bxJ_gRDrsJ-XCWWUD6NiQA_1nlPDA2B';
 
   -- Kald Edge Function asynkront (blokerer ikke INSERT)
   PERFORM extensions.net.http_post(
