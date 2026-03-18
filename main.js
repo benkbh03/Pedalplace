@@ -792,40 +792,44 @@ async function sendMessage(bikeId, receiverId) {
   const content = document.getElementById('message-text').value.trim();
   if (!content) { showToast('⚠️ Skriv en besked først'); return; }
 
-  const { data: msgData, error } = await supabase.from('messages').insert({
+  // INSERT uden SELECT (undgår RLS-problemer med læsning)
+  const { error: insertError } = await supabase.from('messages').insert({
     bike_id:     bikeId,
     sender_id:   currentUser.id,
     receiver_id: receiverId,
     content,
-  }).select('id').single();
+  });
 
-  if (error) { showToast('❌ Kunne ikke sende besked'); console.error('Insert fejl:', error); return; }
+  if (insertError) { showToast('❌ Kunne ikke sende besked'); console.error('Insert fejl:', insertError); return; }
 
-  console.log('Insert OK, msgData:', msgData);
-
-  try {
-    const textEl = document.getElementById('message-text');
-    const boxEl  = document.getElementById('message-box');
-    console.log('textEl:', textEl, 'boxEl:', boxEl);
-    if (textEl) textEl.value = '';
-    if (boxEl)  boxEl.style.display = 'none';
-  } catch (domErr) {
-    console.error('DOM fejl efter insert:', domErr);
-  }
-
+  // Ryd UI og vis toast med det samme
+  const textEl = document.getElementById('message-text');
+  const boxEl  = document.getElementById('message-box');
+  if (textEl) textEl.value = '';
+  if (boxEl)  boxEl.style.display = 'none';
   showToast('✅ Besked sendt!');
 
-  // Send email-notifikation til sælger via Edge Function
+  // Hent message id separat for at sende email-notifikation
+  const { data: msgData, error: selectError } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('bike_id', bikeId)
+    .eq('sender_id', currentUser.id)
+    .eq('receiver_id', receiverId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (selectError) { console.warn('Kunne ikke hente message id:', selectError); return; }
+
+  console.log('message id:', msgData?.id);
   if (msgData?.id) {
-    console.log('Kalder notify-message med id:', msgData.id);
     supabase.functions.invoke('notify-message', {
       body: { message_id: msgData.id },
     }).then(({ data: fnData, error: fnErr }) => {
       console.log('notify-message svar:', fnData, fnErr);
       if (fnErr) console.error('Email notifikation fejlede:', fnErr);
     }).catch(err => console.error('Email notifikation fejlede:', err));
-  } else {
-    console.warn('msgData.id mangler — invoke ikke kaldt. msgData:', msgData);
   }
 }
 
