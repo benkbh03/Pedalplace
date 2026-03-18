@@ -816,13 +816,23 @@ async function sendMessage(bikeId, receiverId) {
     content,
   }).select('id').single();
 
-  if (error) { showToast('❌ Kunne ikke sende besked'); console.error(error); return; }
-  document.getElementById('message-text').value = '';
-  document.getElementById('message-box').style.display = 'none';
+  if (error) { showToast('❌ Kunne ikke sende besked'); console.error('Insert fejl:', error); return; }
+
+  console.log('Insert OK, msgData:', msgData);
+
+  try {
+    const textEl = document.getElementById('message-text');
+    const boxEl  = document.getElementById('message-box');
+    console.log('textEl:', textEl, 'boxEl:', boxEl);
+    if (textEl) textEl.value = '';
+    if (boxEl)  boxEl.style.display = 'none';
+  } catch (domErr) {
+    console.error('DOM fejl efter insert:', domErr);
+  }
+
   showToast('✅ Besked sendt!');
 
   // Send email-notifikation til sælger via Edge Function
-  console.log('msgData:', msgData);
   if (msgData?.id) {
     console.log('Kalder notify-message med id:', msgData.id);
     supabase.functions.invoke('notify-message', {
@@ -832,7 +842,7 @@ async function sendMessage(bikeId, receiverId) {
       if (fnErr) console.error('Email notifikation fejlede:', fnErr);
     }).catch(err => console.error('Email notifikation fejlede:', err));
   } else {
-    console.warn('msgData.id mangler — invoke ikke kaldt');
+    console.warn('msgData.id mangler — invoke ikke kaldt. msgData:', msgData);
   }
 }
 
