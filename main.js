@@ -1016,6 +1016,22 @@ function closeThread() {
   loadInbox();
 }
 
+async function notifyMessageEmail(bikeId, senderId, receiverId) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('bike_id', bikeId)
+    .eq('sender_id', senderId)
+    .eq('receiver_id', receiverId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  if (error || !data?.id) { console.warn('notifyMessageEmail: ingen id', error); return; }
+  supabase.functions.invoke('notify-message', { body: { message_id: data.id } })
+    .then(({ data: r, error: e }) => { console.log('notify-message:', r, e); if (e) console.error(e); })
+    .catch(e => console.error(e));
+}
+
 async function sendReply() {
   if (!activeThread || !currentUser) return;
   const content = document.getElementById('reply-text').value.trim();
@@ -1031,6 +1047,7 @@ async function sendReply() {
   if (error) { showToast('❌ Kunne ikke sende svar'); return; }
   document.getElementById('reply-text').value = '';
   showToast('✅ Svar sendt!');
+  notifyMessageEmail(activeThread.bikeId, currentUser.id, activeThread.otherId);
   openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
 }
 
@@ -1609,6 +1626,8 @@ async function sendInboxReply() {
 
   if (error) { showToast('❌ Kunne ikke sende svar'); return; }
   document.getElementById('inbox-modal-reply-text').value = '';
+  showToast('✅ Svar sendt!');
+  notifyMessageEmail(activeInboxThread.bikeId, currentUser.id, activeInboxThread.otherId);
   openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
 }
 
