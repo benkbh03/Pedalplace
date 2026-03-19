@@ -230,6 +230,15 @@
     </div>
   </section>
 
+  <!-- ── FORHANDLER PROFIL MODAL ── -->
+  <div class="modal-overlay" id="dealer-profile-modal" style="display:none;" onclick="if(event.target===this)closeDealerProfileModal()">
+    <div class="modal dealer-profile-modal-inner">
+      <button class="modal-close" onclick="closeDealerProfileModal()" style="position:absolute;top:16px;right:16px;">✕</button>
+      <div id="dealer-profile-header"></div>
+      <div id="dealer-profile-bikes" class="dealer-profile-bikes-grid"></div>
+    </div>
+  </div>
+
   <!-- ── ALLE FORHANDLERE MODAL ── -->
   <div class="modal-overlay" id="all-dealers-modal" style="display:none;" onclick="if(event.target===this)closeAllDealersModal()">
     <div class="modal" style="max-width:760px;width:100%;">
