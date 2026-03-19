@@ -596,9 +596,13 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 }
 .modal-overlay.open { display: flex; }
 
-/* Profil-modaler skal altid ligge øverst, uanset DOM-rækkefølge */
+/* Profil-modaler ligger over standard-modaler */
 #user-profile-modal,
 #dealer-profile-modal { z-index: 2000; }
+
+/* Cykel-modal ligger over profil-modaler (kan åbnes inde fra en profil) */
+#bike-modal,
+#map-bike-modal { z-index: 2500; }
 .modal {
   background: var(--cream); border-radius: 16px;
   max-width: 600px; width: 100%;
