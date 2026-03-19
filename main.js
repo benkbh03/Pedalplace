@@ -54,6 +54,7 @@ async function init() {
   });
 
   loadBikes();
+  loadDealers();
   updateFilterCounts();
 
   // Åbn indbakke automatisk hvis ?inbox=true er i URL'en
@@ -112,6 +113,72 @@ async function checkUnreadMessages() {
     badge.textContent = count;
     badge.style.display = 'inline';
   }
+}
+
+/* ============================================================
+   FORHANDLERE
+   ============================================================ */
+
+async function loadDealers() {
+  const container = document.getElementById('dealer-cards-container');
+  if (!container) return;
+
+  const { data: dealers, error } = await supabase
+    .from('profiles')
+    .select('id, shop_name, city, name')
+    .eq('seller_type', 'dealer')
+    .eq('verified', true)
+    .order('created_at', { ascending: true });
+
+  if (error || !dealers || dealers.length === 0) {
+    container.className = 'dealer-cards dealer-empty-state';
+    container.innerHTML = `
+      <div class="dealer-empty-card">
+        <div style="font-size:3rem;margin-bottom:16px;">🔍</div>
+        <h3>Ingen forhandlere endnu</h3>
+        <p>Vær den første forhandler på Cykelbørsen og nå tusindvis af cykelkøbere.</p>
+        <button class="btn-become-dealer-small" onclick="openBecomeDealerModal()">Tilmeld din butik →</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Hent antal cykler per forhandler
+  const dealerIds = dealers.map(d => d.id);
+  const { data: bikeRows } = await supabase
+    .from('bikes')
+    .select('user_id')
+    .in('user_id', dealerIds);
+
+  const countMap = {};
+  if (bikeRows) {
+    for (const b of bikeRows) {
+      countMap[b.user_id] = (countMap[b.user_id] || 0) + 1;
+    }
+  }
+
+  container.className = 'dealer-cards';
+  container.innerHTML = dealers.map(dealer => {
+    const displayName = dealer.shop_name || dealer.name || 'Forhandler';
+    const initials = displayName.substring(0, 2).toUpperCase();
+    const bikeCount = countMap[dealer.id] || 0;
+    const cityText = dealer.city ? dealer.city : '';
+    return `
+      <div class="dealer-card" onclick="filterByDealerCard('${dealer.id}')" style="cursor:pointer;" title="Se cykler fra ${displayName}">
+        <div class="dealer-logo-circle">${initials}</div>
+        <div class="dealer-name">${displayName} <span class="dealer-verified-tick" title="Verificeret forhandler">✓</span></div>
+        ${cityText ? `<div class="dealer-city">📍 ${cityText}</div>` : ''}
+        <div class="dealer-count">${bikeCount} ${bikeCount === 1 ? 'cykel' : 'cykler'} til salg</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterByDealerCard(dealerId) {
+  // Scroll til annoncer og filtrer
+  const grid = document.getElementById('listings-grid');
+  if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  loadBikesWithFilters({ sellerType: 'dealer', dealerId });
 }
 
 /* ============================================================
@@ -1070,7 +1137,7 @@ function applyFilters() {
   loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sellerType });
 }
 
-async function loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sellerType }) {
+async function loadBikesWithFilters({ types = [], conditions = [], minPrice, maxPrice, sellerType, dealerId } = {}) {
   const grid = document.getElementById('listings-grid');
   grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
 
@@ -1084,6 +1151,7 @@ async function loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sel
   if (conditions.length > 0) query = query.in('condition', conditions);
   if (minPrice)              query = query.gte('price', minPrice);
   if (maxPrice)              query = query.lte('price', maxPrice);
+  if (dealerId)              query = query.eq('user_id', dealerId);
 
   const { data, error } = await query;
   if (error) {
@@ -1094,7 +1162,7 @@ async function loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sel
 
   // Filtrer sælgertype lokalt (da det er en join-kolonne)
   let filtered = data;
-  if (sellerType) {
+  if (sellerType && !dealerId) {
     filtered = data.filter(b => b.profiles?.seller_type === sellerType);
   }
 

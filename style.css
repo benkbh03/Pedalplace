@@ -344,7 +344,21 @@ nav {
 }
 .dealer-card:hover { background: rgba(245,240,232,0.13); }
 .dealer-logo { font-size: 2rem; margin-bottom: 10px; }
+.dealer-logo-circle {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--rust); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 700;
+  margin-bottom: 12px;
+}
 .dealer-name { font-family: 'Fraunces', serif; font-size: 1.05rem; color: var(--sand); font-weight: 600; margin-bottom: 4px; }
+.dealer-verified-tick {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #4caf50; color: #fff;
+  font-size: 0.6rem; font-weight: 700; font-style: normal;
+  vertical-align: middle; margin-left: 4px;
+}
 .dealer-city { font-size: 0.8rem; color: var(--sand); opacity: 0.55; }
 .dealer-count { font-size: 0.78rem; color: var(--rust-light); margin-top: 8px; font-weight: 500; }
 
