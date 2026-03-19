@@ -806,7 +806,7 @@ async function submitListing() {
   const selects = modalEl.querySelectorAll('select');
   const type      = selects[0].value;
   const size      = selects[1].value;
-  const condition = selects[2].value;
+  const condition = selects[3].value;
 
   const wheelSize = document.getElementById('modal-wheel-size')?.value || null;
 
