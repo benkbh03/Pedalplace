@@ -230,6 +230,18 @@ function closeAllDealersModal() {
   document.body.style.overflow = '';
 }
 
+function closeAllModals() {
+  ['all-dealers-modal','dealer-profile-modal','user-profile-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  ['bike-modal','map-bike-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+  });
+  document.body.style.overflow = '';
+}
+
 function filterByDealerCard(dealerId) {
   openDealerProfile(dealerId);
 }
@@ -346,9 +358,7 @@ function closeDealerProfileModal() {
    ============================================================ */
 
 async function openUserProfile(userId) {
-  closeAllDealersModal();
-  closeDealerProfileModal();
-  closeBikeModal();
+  closeAllModals();
   const modal   = document.getElementById('user-profile-modal');
   const content = document.getElementById('user-profile-content');
   if (!modal || !content) { console.error('user-profile-modal eller user-profile-content ikke fundet i DOM'); return; }
@@ -1078,6 +1088,7 @@ function showSection(section) {
    ============================================================ */
 
 async function openBikeModal(bikeId) {
+  closeAllModals();
   document.getElementById('bike-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
