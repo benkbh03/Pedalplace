@@ -595,6 +595,10 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   padding: 24px; backdrop-filter: blur(3px);
 }
 .modal-overlay.open { display: flex; }
+
+/* Profil-modaler skal altid ligge øverst, uanset DOM-rækkefølge */
+#user-profile-modal,
+#dealer-profile-modal { z-index: 2000; }
 .modal {
   background: var(--cream); border-radius: 16px;
   max-width: 600px; width: 100%;
