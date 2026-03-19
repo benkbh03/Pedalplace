@@ -193,7 +193,7 @@ function buildDealerCard(dealer, countMap, featured = false) {
   const cityText      = dealer.city || '';
   const featuredClass = featured ? ' dealer-card--featured' : '';
   return `
-    <div class="dealer-card${featuredClass}" onclick="filterByDealerCard('${dealer.id}')" style="cursor:pointer;" title="Se cykler fra ${displayName}">
+    <div class="dealer-card${featuredClass}" onclick="openUserProfile('${dealer.id}')" style="cursor:pointer;" title="Se ${displayName}s profil">
       <div class="dealer-logo-circle">${initials}</div>
       <div class="dealer-name">${displayName} <span class="dealer-verified-tick" title="Verificeret forhandler">✓</span></div>
       ${cityText ? `<div class="dealer-city">📍 ${cityText}</div>` : ''}
@@ -358,13 +358,15 @@ async function openUserProfile(userId) {
     { data: profile },
     { data: activeBikes },
     { data: soldBikes },
-    { data: reviews }
+    reviewsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('id, name, shop_name, seller_type, city, verified, id_verified, created_at').eq('id', userId).single(),
     supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false }),
     supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false }),
     supabase.from('reviews').select('*, reviewer:profiles!reviews_reviewer_id_fkey(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false }),
   ]);
+  // Reviews-tabellen er muligvis ikke oprettet endnu — fejl håndteres blødsomt
+  const reviews = reviewsResult.error ? [] : (reviewsResult.data || []);
 
   if (!profile) {
     content.innerHTML = '<p style="color:var(--rust);padding:40px;text-align:center;">Kunne ikke hente profil.</p>';
