@@ -157,25 +157,68 @@ async function loadDealers() {
     }
   }
 
+  // Sorter efter antal cykler (flest først)
+  dealers.sort((a, b) => (countMap[b.id] || 0) - (countMap[a.id] || 0));
+
+  const top3    = dealers.slice(0, 3);
+  const rest    = dealers.slice(3);
+
   container.className = 'dealer-cards';
-  container.innerHTML = dealers.map(dealer => {
-    const displayName = dealer.shop_name || dealer.name || 'Forhandler';
-    const initials = displayName.substring(0, 2).toUpperCase();
-    const bikeCount = countMap[dealer.id] || 0;
-    const cityText = dealer.city ? dealer.city : '';
-    return `
-      <div class="dealer-card" onclick="filterByDealerCard('${dealer.id}')" style="cursor:pointer;" title="Se cykler fra ${displayName}">
-        <div class="dealer-logo-circle">${initials}</div>
-        <div class="dealer-name">${displayName} <span class="dealer-verified-tick" title="Verificeret forhandler">✓</span></div>
-        ${cityText ? `<div class="dealer-city">📍 ${cityText}</div>` : ''}
-        <div class="dealer-count">${bikeCount} ${bikeCount === 1 ? 'cykel' : 'cykler'} til salg</div>
-      </div>
+  container.innerHTML = top3.map(dealer => buildDealerCard(dealer, countMap, true)).join('');
+
+  // Knap hvis der er flere end 3
+  if (rest.length > 0) {
+    const btn = document.createElement('div');
+    btn.className = 'dealer-see-all-wrap';
+    btn.innerHTML = `
+      <button class="btn-see-all-dealers" onclick="openAllDealersModal()">
+        Se alle verificerede forhandlere (${dealers.length}) →
+      </button>
     `;
-  }).join('');
+    container.after(btn);
+  }
+
+  // Gem alle forhandlere til modal brug
+  window._allDealers    = dealers;
+  window._dealerCountMap = countMap;
+}
+
+function buildDealerCard(dealer, countMap, featured = false) {
+  const displayName = dealer.shop_name || dealer.name || 'Forhandler';
+  const initials    = displayName.substring(0, 2).toUpperCase();
+  const bikeCount   = countMap[dealer.id] || 0;
+  const cityText    = dealer.city || '';
+  const featuredClass = featured ? ' dealer-card--featured' : '';
+  return `
+    <div class="dealer-card${featuredClass}" onclick="filterByDealerCard('${dealer.id}')" style="cursor:pointer;" title="Se cykler fra ${displayName}">
+      ${featured ? '<div class="dealer-featured-label">Fremhævet</div>' : ''}
+      <div class="dealer-logo-circle">${initials}</div>
+      <div class="dealer-name">${displayName} <span class="dealer-verified-tick" title="Verificeret forhandler">✓</span></div>
+      ${cityText ? `<div class="dealer-city">📍 ${cityText}</div>` : ''}
+      <div class="dealer-count">${bikeCount} ${bikeCount === 1 ? 'cykel' : 'cykler'} til salg</div>
+    </div>
+  `;
+}
+
+function openAllDealersModal() {
+  const modal = document.getElementById('all-dealers-modal');
+  if (!modal) return;
+  const grid = document.getElementById('all-dealers-grid');
+  const dealers   = window._allDealers    || [];
+  const countMap  = window._dealerCountMap || {};
+  grid.innerHTML = dealers.map(d => buildDealerCard(d, countMap, false)).join('');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAllDealersModal() {
+  const modal = document.getElementById('all-dealers-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
 }
 
 function filterByDealerCard(dealerId) {
-  // Scroll til annoncer og filtrer
+  closeAllDealersModal();
   const grid = document.getElementById('listings-grid');
   if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   loadBikesWithFilters({ sellerType: 'dealer', dealerId });

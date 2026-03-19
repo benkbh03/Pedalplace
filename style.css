@@ -362,6 +362,39 @@ nav {
 .dealer-city { font-size: 0.8rem; color: var(--sand); opacity: 0.55; }
 .dealer-count { font-size: 0.78rem; color: var(--rust-light); margin-top: 8px; font-weight: 500; }
 
+/* Fremhævede forhandler-kort (top 3) */
+.dealer-card--featured {
+  background: rgba(200,130,42,0.13);
+  border: 1.5px solid rgba(200,130,42,0.45);
+  position: relative;
+}
+.dealer-card--featured:hover { background: rgba(200,130,42,0.2); }
+.dealer-featured-label {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--rust); color: #fff;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase;
+}
+
+/* "Se alle forhandlere" knap under top-3 */
+.dealer-see-all-wrap {
+  display: flex; justify-content: center;
+  margin-top: 20px;
+}
+.btn-see-all-dealers {
+  background: transparent; color: var(--sand);
+  border: 1.5px solid rgba(245,240,232,0.3);
+  padding: 11px 28px; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+}
+.btn-see-all-dealers:hover {
+  background: rgba(245,240,232,0.08);
+  border-color: rgba(245,240,232,0.6);
+}
+
 /* Tom forhandler state */
 .dealer-empty-state { grid-template-columns: 1fr !important; }
 .dealer-empty-card {

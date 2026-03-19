@@ -230,6 +230,20 @@
     </div>
   </section>
 
+  <!-- ── ALLE FORHANDLERE MODAL ── -->
+  <div class="modal-overlay" id="all-dealers-modal" style="display:none;" onclick="if(event.target===this)closeAllDealersModal()">
+    <div class="modal" style="max-width:760px;width:100%;">
+      <div class="modal-header">
+        <h2>Alle verificerede forhandlere</h2>
+        <button class="modal-close" onclick="closeAllDealersModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--muted);margin-bottom:20px;font-size:0.9rem;">Klik på en forhandler for at se deres cykler til salg.</p>
+        <div id="all-dealers-grid" class="dealer-cards"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── BLIV FORHANDLER MODAL ── -->
   <div class="modal-overlay" id="dealer-modal">
     <div class="modal" style="max-width:520px;">
