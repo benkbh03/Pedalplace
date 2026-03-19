@@ -155,10 +155,10 @@
       <div class="sidebar-box">
         <h3>Hjulstørrelse</h3>
         <div class="filter-group">
-          <label class="filter-option"><input type="checkbox"> 26" <span class="filter-count">–</span></label>
-          <label class="filter-option"><input type="checkbox"> 27.5" / 650b <span class="filter-count">–</span></label>
-          <label class="filter-option"><input type="checkbox"> 28" <span class="filter-count">–</span></label>
-          <label class="filter-option"><input type="checkbox"> 29" <span class="filter-count">–</span></label>
+          <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='26"' onchange="applyFilters()"> 26" <span class="filter-count">–</span></label>
+          <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='27.5" / 650b' onchange="applyFilters()"> 27.5" / 650b <span class="filter-count">–</span></label>
+          <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='28"' onchange="applyFilters()"> 28" <span class="filter-count">–</span></label>
+          <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='29"' onchange="applyFilters()"> 29" <span class="filter-count">–</span></label>
         </div>
       </div>
     </aside>
@@ -342,6 +342,10 @@
           <div class="form-group">
             <label>Ramme / str.</label>
             <select><option value="">Vælg</option><option>XS (44–48 cm)</option><option>S (49–52 cm)</option><option>M (53–56 cm)</option><option>L (57–60 cm)</option><option>XL (61+ cm)</option></select>
+          </div>
+          <div class="form-group">
+            <label>Hjulstørrelse</label>
+            <select id="modal-wheel-size"><option value="">Vælg</option><option>26"</option><option>27.5" / 650b</option><option>28"</option><option>29"</option></select>
           </div>
           <div class="form-group"><label>Pris (kr.) *</label><input type="number" placeholder="f.eks. 4500"></div>
           <div class="form-group"><label>Årstal</label><input type="number" placeholder="f.eks. 2021"></div>
@@ -592,6 +596,16 @@
         <label class="filter-option"><input type="checkbox" data-filter="condition" data-value="Som ny" onchange="applyFilters()"> Som ny <span class="filter-count">–</span></label>
         <label class="filter-option"><input type="checkbox" data-filter="condition" data-value="God stand" onchange="applyFilters()"> God stand <span class="filter-count">–</span></label>
         <label class="filter-option"><input type="checkbox" data-filter="condition" data-value="Brugt" onchange="applyFilters()"> Brugt <span class="filter-count">–</span></label>
+      </div>
+    </div>
+
+    <div class="sidebar-box">
+      <h3>Hjulstørrelse</h3>
+      <div class="filter-group">
+        <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='26"' onchange="applyFilters()"> 26" <span class="filter-count">–</span></label>
+        <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='27.5" / 650b' onchange="applyFilters()"> 27.5" / 650b <span class="filter-count">–</span></label>
+        <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='28"' onchange="applyFilters()"> 28" <span class="filter-count">–</span></label>
+        <label class="filter-option"><input type="checkbox" data-filter="wheel" data-value='29"' onchange="applyFilters()"> 29" <span class="filter-count">–</span></label>
       </div>
     </div>
 

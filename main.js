@@ -773,6 +773,7 @@ function togglePill(el) {
 
 function openModal() {
   if (!currentUser) { openLoginModal(); showToast('⚠️ Log ind for at oprette en annonce'); return; }
+  selectType('private');
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -807,11 +808,14 @@ async function submitListing() {
   const size      = selects[1].value;
   const condition = selects[2].value;
 
+  const wheelSize = document.getElementById('modal-wheel-size')?.value || null;
+
   const bikeData = {
     user_id:     currentUser.id,
     brand, model, price, year, city,
     description: desc,
     type, size, condition,
+    wheel_size:  wheelSize || null,
     title:       `${brand} ${model}`,
     is_active:   true,
   };
@@ -1511,6 +1515,10 @@ function applyFilters() {
   const conditions = [...document.querySelectorAll('[data-filter="condition"]:checked')]
     .map(el => el.dataset.value);
 
+  // Saml valgte hjulstørrelser
+  const wheelSizes = [...document.querySelectorAll('[data-filter="wheel"]:checked')]
+    .map(el => el.dataset.value);
+
   // Pris
   const minPrice = parseInt(document.querySelector('.price-range input:first-of-type')?.value) || null;
   const maxPrice = parseInt(document.querySelector('.price-range input:last-of-type')?.value) || null;
@@ -1520,10 +1528,10 @@ function applyFilters() {
   if (sellerDealer?.checked && !sellerPrivate?.checked) sellerType = 'dealer';
   if (sellerPrivate?.checked && !sellerDealer?.checked) sellerType = 'private';
 
-  loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sellerType });
+  loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sellerType, wheelSizes });
 }
 
-async function loadBikesWithFilters({ types = [], conditions = [], minPrice, maxPrice, sellerType, dealerId } = {}) {
+async function loadBikesWithFilters({ types = [], conditions = [], minPrice, maxPrice, sellerType, dealerId, wheelSizes = [] } = {}) {
   const grid = document.getElementById('listings-grid');
   grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
 
@@ -1538,6 +1546,7 @@ async function loadBikesWithFilters({ types = [], conditions = [], minPrice, max
   if (minPrice)              query = query.gte('price', minPrice);
   if (maxPrice)              query = query.lte('price', maxPrice);
   if (dealerId)              query = query.eq('user_id', dealerId);
+  if (wheelSizes.length > 0) query = query.in('wheel_size', wheelSizes);
 
   const { data, error } = await query;
   if (error) {
