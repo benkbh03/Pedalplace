@@ -603,6 +603,9 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 /* Cykel-modal ligger over profil-modaler (kan åbnes inde fra en profil) */
 #bike-modal,
 #map-bike-modal { z-index: 2500; }
+
+/* Del/share-modal skal ligge over cykel-modalen */
+#share-modal { z-index: 3000; }
 .modal {
   background: var(--cream); border-radius: 16px;
   max-width: 600px; width: 100%;
