@@ -369,11 +369,15 @@ async function openUserProfile(userId) {
   // Hent parallelt: profil, aktive cykler, solgte cykler, anmeldelser
   let profile, activeBikes, soldBikes, reviews;
   try {
-    const [r1, r2, r3, reviewsResult] = await Promise.all([
+    const [r1, r2, r3, reviewsResult, messagesResult] = await Promise.all([
       supabase.from('profiles').select('id, name, shop_name, seller_type, city, verified, id_verified, created_at').eq('id', userId).single(),
       supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false }),
       supabase.from('reviews').select('*, reviewer:profiles!reviews_reviewer_id_fkey(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false }),
+      currentUser
+        ? supabase.from('messages').select('id', { count: 'exact', head: true })
+            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+        : Promise.resolve({ count: 0 }),
     ]);
     profile     = r1.data;
     activeBikes = r2.data;
@@ -401,6 +405,7 @@ async function openUserProfile(userId) {
   const reviewList   = reviews || [];
   const avgRating    = reviewList.length ? (reviewList.reduce((s, r) => s + r.rating, 0) / reviewList.length) : null;
   const hasReviewed  = currentUser && reviewList.some(r => r.reviewer_id === currentUser.id);
+  const hasTraded    = currentUser && ((messagesResult?.count ?? 0) > 0);
 
   // Stjerner helper
   function stars(n) {
@@ -453,8 +458,8 @@ async function openUserProfile(userId) {
       </div>`;
   }).join('') || `<p class="up-empty">Ingen vurderinger endnu.</p>`;
 
-  // Skriv anmeldelse formular
-  const writeReviewHtml = (!isOwnProfile && currentUser && !hasReviewed) ? `
+  // Skriv anmeldelse formular — kun synlig hvis de to har handlet (beskeder) og ikke allerede vurderet
+  const writeReviewHtml = (!isOwnProfile && currentUser && !hasReviewed && hasTraded) ? `
     <div class="up-write-review" id="write-review-wrap">
       <h4 class="up-section-title" style="margin-bottom:12px;">Giv en vurdering</h4>
       <div class="up-star-picker" id="star-picker">
@@ -462,7 +467,10 @@ async function openUserProfile(userId) {
       </div>
       <textarea id="review-comment" class="up-review-textarea" placeholder="Fortæl om din handel med ${displayName}... (valgfrit)"></textarea>
       <button class="btn-submit-review" onclick="submitReview('${userId}')">Send vurdering</button>
-    </div>` : '';
+    </div>`
+  : (!isOwnProfile && currentUser && !hasReviewed) ? `
+    <p class="up-empty" style="font-size:0.85rem;color:var(--muted);margin-top:8px;">Du kan kun vurdere brugere du har handlet med.</p>`
+  : '';
 
   content.innerHTML = `
     <!-- Header -->
@@ -543,6 +551,12 @@ async function submitReview(reviewedUserId) {
 
   if (!currentUser)       { showToast('⚠️ Log ind for at give en vurdering'); return; }
   if (rating < 1)         { showToast('⚠️ Vælg et antal stjerner'); return; }
+
+  // Verificér at de to brugere har beskeder (= handlet) med hinanden
+  const { count: msgCount } = await supabase.from('messages')
+    .select('id', { count: 'exact', head: true })
+    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${reviewedUserId}),and(sender_id.eq.${reviewedUserId},receiver_id.eq.${currentUser.id})`);
+  if (!msgCount) { showToast('⚠️ Du kan kun vurdere brugere du har handlet med'); return; }
 
   const { error } = await supabase.from('reviews').insert({
     reviewer_id:      currentUser.id,
