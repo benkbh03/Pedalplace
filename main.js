@@ -367,25 +367,33 @@ async function openUserProfile(userId) {
   document.body.style.overflow = 'hidden';
 
   // Hent parallelt: profil, aktive cykler, solgte cykler, anmeldelser
-  let profile, activeBikes, soldBikes, reviews;
+  let profile, activeBikes, soldBikes, reviews, messagesCount;
   try {
-    const [r1, r2, r3, reviewsResult, messagesResult] = await Promise.all([
-      supabase.from('profiles').select('id, name, shop_name, seller_type, city, verified, id_verified, created_at').eq('id', userId).single(),
-      supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false }),
-      supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false }),
-      supabase.from('reviews').select('*, reviewer:profiles!reviews_reviewer_id_fkey(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false }),
-      currentUser
-        ? Promise.all([
-            supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', userId).limit(1),
-            supabase.from('messages').select('id').eq('sender_id', userId).eq('receiver_id', currentUser.id).limit(1),
-          ]).then(([a, b]) => ({ count: (a.data?.length || 0) + (b.data?.length || 0) }))
-        : Promise.resolve({ count: 0 }),
+    const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
+
+    const [r1, r2, r3, r4] = await Promise.all([
+      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, verified, id_verified, created_at').eq('id', userId).single()),
+      safe(supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
+      safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
+      safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
     ]);
+
     profile     = r1.data;
     activeBikes = r2.data;
     soldBikes   = r3.data;
-    reviews     = reviewsResult.error ? [] : (reviewsResult.data || []);
+    reviews     = r4.error ? [] : (r4.data || []);
+
     if (r1.error) console.warn('Profil-fejl:', r1.error);
+
+    if (currentUser) {
+      const [msgA, msgB] = await Promise.all([
+        safe(supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', userId).limit(1)),
+        safe(supabase.from('messages').select('id').eq('sender_id', userId).eq('receiver_id', currentUser.id).limit(1)),
+      ]);
+      messagesCount = (msgA.data?.length || 0) + (msgB.data?.length || 0);
+    } else {
+      messagesCount = 0;
+    }
   } catch (err) {
     console.error('openUserProfile fejlede:', err);
     content.innerHTML = '<p style="color:var(--rust);padding:40px;text-align:center;">Fejl ved hentning af profil.</p>';
@@ -407,7 +415,7 @@ async function openUserProfile(userId) {
   const reviewList   = reviews || [];
   const avgRating    = reviewList.length ? (reviewList.reduce((s, r) => s + r.rating, 0) / reviewList.length) : null;
   const hasReviewed  = currentUser && reviewList.some(r => r.reviewer_id === currentUser.id);
-  const hasTraded    = currentUser && ((messagesResult?.count ?? 0) > 0);
+  const hasTraded    = currentUser && messagesCount > 0;
 
   // Stjerner helper
   function stars(n) {
