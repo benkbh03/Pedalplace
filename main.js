@@ -375,8 +375,10 @@ async function openUserProfile(userId) {
       supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false }),
       supabase.from('reviews').select('*, reviewer:profiles!reviews_reviewer_id_fkey(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false }),
       currentUser
-        ? supabase.from('messages').select('id', { count: 'exact', head: true })
-            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+        ? Promise.all([
+            supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', userId).limit(1),
+            supabase.from('messages').select('id').eq('sender_id', userId).eq('receiver_id', currentUser.id).limit(1),
+          ]).then(([a, b]) => ({ count: (a.data?.length || 0) + (b.data?.length || 0) }))
         : Promise.resolve({ count: 0 }),
     ]);
     profile     = r1.data;
@@ -553,10 +555,12 @@ async function submitReview(reviewedUserId) {
   if (rating < 1)         { showToast('⚠️ Vælg et antal stjerner'); return; }
 
   // Verificér at de to brugere har beskeder (= handlet) med hinanden
-  const { count: msgCount } = await supabase.from('messages')
-    .select('id', { count: 'exact', head: true })
-    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${reviewedUserId}),and(sender_id.eq.${reviewedUserId},receiver_id.eq.${currentUser.id})`);
-  if (!msgCount) { showToast('⚠️ Du kan kun vurdere brugere du har handlet med'); return; }
+  const [msgA, msgB] = await Promise.all([
+    supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', reviewedUserId).limit(1),
+    supabase.from('messages').select('id').eq('sender_id', reviewedUserId).eq('receiver_id', currentUser.id).limit(1),
+  ]);
+  const hasTraded = (msgA.data?.length || 0) + (msgB.data?.length || 0) > 0;
+  if (!hasTraded) { showToast('⚠️ Du kan kun vurdere brugere du har handlet med'); return; }
 
   const { error } = await supabase.from('reviews').insert({
     reviewer_id:      currentUser.id,
@@ -787,7 +791,20 @@ function togglePill(el) {
 
 function openModal() {
   if (!currentUser) { openLoginModal(); showToast('⚠️ Log ind for at oprette en annonce'); return; }
-  selectType('private');
+
+  const isDealer = currentProfile?.seller_type === 'dealer';
+
+  // Vis kun den relevante selger-type knap baseret på brugerens profil
+  document.getElementById('type-private').style.display = !isDealer ? '' : 'none';
+  document.getElementById('type-dealer').style.display  = isDealer  ? '' : 'none';
+
+  // Skjul "Hvem sælger du som?"-toggle helt for privatpersoner (kun én mulighed)
+  const sellerToggleLabel = document.querySelector('.modal-seller-label');
+  const sellerToggle      = document.querySelector('.seller-toggle');
+  if (sellerToggleLabel) sellerToggleLabel.style.display = isDealer ? '' : 'none';
+  if (sellerToggle)      sellerToggle.style.display      = isDealer ? '' : 'none';
+
+  selectType(isDealer ? 'dealer' : 'private');
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
