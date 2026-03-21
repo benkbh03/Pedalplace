@@ -63,6 +63,13 @@ async function init() {
     openInboxModal();
   }
 
+  // Åbn delt annonce automatisk hvis ?bike=ID er i URL'en
+  const sharedBikeId = new URLSearchParams(window.location.search).get('bike');
+  if (sharedBikeId) {
+    history.replaceState(null, '', window.location.pathname);
+    openBikeModal(sharedBikeId);
+  }
+
   // Klik uden for modal lukker den
   document.getElementById('inbox-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeInboxModal();
@@ -1660,12 +1667,18 @@ supabase.auth.onAuthStateChange((_event, session) => {
    REDIGER ANNONCE
    ============================================================ */
 
+// Billede-state for redigér-modal (adskilt fra opret-modal)
+let editNewFiles      = [];  // { file, url, isPrimary }
+let editExistingImgs  = [];  // { id, url, is_primary, toDelete }
+
 async function openEditModal(id) {
   const { data: b, error } = await supabase
-    .from('bikes').select('*').eq('id', id).single();
+    .from('bikes')
+    .select('*, bike_images(id, url, is_primary)')
+    .eq('id', id).single();
   if (error || !b) { showToast('❌ Kunne ikke hente annonce'); return; }
 
-  // Udfyld felterne
+  // Udfyld tekstfelterne
   document.getElementById('edit-bike-id').value       = b.id;
   document.getElementById('edit-brand').value         = b.brand || '';
   document.getElementById('edit-model').value         = b.model || '';
@@ -1678,11 +1691,94 @@ async function openEditModal(id) {
   document.getElementById('edit-condition').value     = b.condition || '';
   document.getElementById('edit-is-active').checked   = b.is_active;
 
+  // Indlæs eksisterende billeder
+  editNewFiles     = [];
+  editExistingImgs = (b.bike_images || []).map(img => ({ ...img, toDelete: false }));
+  renderEditExistingImages();
+  renderEditNewImages();
+
   document.getElementById('edit-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
+function renderEditExistingImages() {
+  const grid = document.getElementById('edit-img-existing-grid');
+  if (!grid) return;
+  grid.innerHTML = editExistingImgs.filter(img => !img.toDelete).map((img, i) => `
+    <div class="img-preview-item ${img.is_primary ? 'primary' : ''}">
+      <img src="${img.url}" alt="Billede">
+      ${img.is_primary ? '<span class="primary-badge">Primær</span>' : `<button class="set-primary" onclick="editSetExistingPrimary(${i})">★</button>`}
+      <button class="remove-img" onclick="editRemoveExisting(${i})">✕</button>
+    </div>`).join('') || '';
+}
+
+function editSetExistingPrimary(index) {
+  const visible = editExistingImgs.filter(img => !img.toDelete);
+  const target  = visible[index];
+  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img.id === target.id }));
+  editNewFiles     = editNewFiles.map(f => ({ ...f, isPrimary: false }));
+  renderEditExistingImages();
+  renderEditNewImages();
+}
+
+function editRemoveExisting(index) {
+  const visible = editExistingImgs.filter(img => !img.toDelete);
+  const target  = visible[index];
+  const wasPrimary = target.is_primary;
+  editExistingImgs = editExistingImgs.map(img => img.id === target.id ? { ...img, toDelete: true, is_primary: false } : img);
+  // Sæt ny primær hvis den primære blev fjernet
+  if (wasPrimary) {
+    const remaining = editExistingImgs.filter(img => !img.toDelete);
+    if (remaining.length > 0) remaining[0].is_primary = true;
+    else if (editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
+  }
+  renderEditExistingImages();
+}
+
+function editPreviewImages(input) {
+  const files = Array.from(input.files);
+  const remaining = 8 - editExistingImgs.filter(img => !img.toDelete).length - editNewFiles.length;
+  files.slice(0, remaining).forEach((file, i) => {
+    const hasPrimary = editExistingImgs.some(img => !img.toDelete && img.is_primary) || editNewFiles.some(f => f.isPrimary);
+    editNewFiles.push({ file, url: URL.createObjectURL(file), isPrimary: !hasPrimary && i === 0 });
+  });
+  renderEditNewImages();
+}
+
+function renderEditNewImages() {
+  const grid = document.getElementById('edit-img-new-grid');
+  if (!grid) return;
+  grid.innerHTML = editNewFiles.map((item, i) => `
+    <div class="img-preview-item ${item.isPrimary ? 'primary' : ''}">
+      <img src="${item.url}" alt="Nyt billede">
+      ${item.isPrimary ? '<span class="primary-badge">Primær</span>' : `<button class="set-primary" onclick="editSetNewPrimary(${i})">★</button>`}
+      <button class="remove-img" onclick="editRemoveNew(${i})">✕</button>
+    </div>`).join('');
+  const label = document.getElementById('edit-upload-label');
+  if (label) label.textContent = editNewFiles.length > 0
+    ? `${editNewFiles.length} nye billede${editNewFiles.length !== 1 ? 'r' : ''} klar til upload`
+    : 'Klik for at tilføje billeder';
+}
+
+function editSetNewPrimary(index) {
+  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: false }));
+  editNewFiles     = editNewFiles.map((f, i) => ({ ...f, isPrimary: i === index }));
+  renderEditExistingImages();
+  renderEditNewImages();
+}
+
+function editRemoveNew(index) {
+  URL.revokeObjectURL(editNewFiles[index].url);
+  const wasPrimary = editNewFiles[index].isPrimary;
+  editNewFiles.splice(index, 1);
+  if (wasPrimary && editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
+  renderEditNewImages();
+}
+
 function closeEditModal() {
+  editNewFiles.forEach(f => URL.revokeObjectURL(f.url));
+  editNewFiles     = [];
+  editExistingImgs = [];
   document.getElementById('edit-modal').classList.remove('open');
   document.body.style.overflow = '';
 }
@@ -1710,6 +1806,30 @@ async function saveEditedListing() {
 
   const { error } = await supabase.from('bikes').update(updates).eq('id', id);
   if (error) { showToast('❌ Kunne ikke gemme ændringer'); console.error(error); return; }
+
+  // Slet fjernede billeder
+  const toDelete = editExistingImgs.filter(img => img.toDelete);
+  for (const img of toDelete) {
+    await supabase.from('bike_images').delete().eq('id', img.id);
+  }
+
+  // Opdater primær-status på eksisterende billeder
+  for (const img of editExistingImgs.filter(img => !img.toDelete)) {
+    await supabase.from('bike_images').update({ is_primary: img.is_primary }).eq('id', img.id);
+  }
+
+  // Upload nye billeder
+  for (const item of editNewFiles) {
+    const ext      = item.file.name.split('.').pop();
+    const filename = `${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadErr } = await supabase.storage.from('bike-images').upload(filename, item.file, { contentType: item.file.type });
+    if (uploadErr) { console.error('Upload fejl:', uploadErr); continue; }
+    const { data: { publicUrl } } = supabase.storage.from('bike-images').getPublicUrl(filename);
+    await supabase.from('bike_images').insert({ bike_id: id, url: publicUrl, is_primary: item.isPrimary });
+  }
+  editNewFiles.forEach(f => URL.revokeObjectURL(f.url));
+  editNewFiles     = [];
+  editExistingImgs = [];
 
   closeEditModal();
   showToast('✅ Annonce opdateret!');
@@ -1936,9 +2056,14 @@ window.openMobileFilter   = openMobileFilter;
 window.closeMobileFilter  = closeMobileFilter;
 window.closeResetModal    = closeResetModal;
 window.handleResetPassword = handleResetPassword;
-window.openEditModal      = openEditModal;
-window.closeEditModal     = closeEditModal;
-window.saveEditedListing  = saveEditedListing;
+window.openEditModal          = openEditModal;
+window.closeEditModal         = closeEditModal;
+window.saveEditedListing      = saveEditedListing;
+window.editPreviewImages      = editPreviewImages;
+window.editSetExistingPrimary = editSetExistingPrimary;
+window.editRemoveExisting     = editRemoveExisting;
+window.editSetNewPrimary      = editSetNewPrimary;
+window.editRemoveNew          = editRemoveNew;
 window.previewImages      = previewImages;
 window.setPrimary         = setPrimary;
 window.removeImage        = removeImage;
@@ -2245,11 +2370,18 @@ function closeFooterModal() {
   document.body.style.overflow = '';
 }
 
-function submitContactForm() {
+async function submitContactForm() {
   var name    = document.getElementById('contact-name').value.trim();
   var email   = document.getElementById('contact-email').value.trim();
   var message = document.getElementById('contact-message').value.trim();
   if (!name || !email || !message) { showToast('⚠️ Udfyld alle felter'); return; }
+
+  const { error } = await supabase.from('contact_messages').insert({ name, email, message });
+  if (error) { console.error('Kontaktformular fejl:', error); showToast('❌ Noget gik galt – prøv igen'); return; }
+
+  document.getElementById('contact-name').value    = '';
+  document.getElementById('contact-email').value   = '';
+  document.getElementById('contact-message').value = '';
   closeFooterModal();
   showToast('✅ Tak! Vi vender tilbage inden for 1-2 hverdage.');
 }
