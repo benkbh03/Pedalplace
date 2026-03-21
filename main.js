@@ -2963,7 +2963,7 @@ async function submitIdVerification() {
   var filename = 'id-docs/' + currentUser.id + '/id-' + Date.now() + '.' + ext;
 
   var uploadResult = await supabase.storage
-    .from('bike-images')
+    .from('id-documents')
     .upload(filename, idDocFile, { contentType: idDocFile.type, upsert: true });
 
   if (uploadResult.error) {
@@ -2972,7 +2972,7 @@ async function submitIdVerification() {
     return;
   }
 
-  var publicUrl = supabase.storage.from('bike-images').getPublicUrl(filename).data.publicUrl;
+  var publicUrl = supabase.storage.from('id-documents').getPublicUrl(filename).data.publicUrl;
 
   // Gem URL og status i profil
   var updateResult = await supabase.from('profiles').update({
