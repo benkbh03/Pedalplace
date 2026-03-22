@@ -369,7 +369,7 @@
             <div id="img-preview-grid" class="img-preview-grid"></div>
           </div>
         </div>
-        <button class="form-submit" onclick="submitListing()">Opret annonce gratis</button>
+        <button id="submit-listing-btn" class="form-submit" onclick="submitListing()">Opret annonce gratis</button>
       </div>
     </div>
   </div>
@@ -395,7 +395,7 @@
             <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="din@email.dk"></div>
             <div class="form-group"><label>Adgangskode</label><input type="password" id="login-password" placeholder="••••••••"></div>
           </div>
-          <button class="form-submit" onclick="handleLogin()">Log ind</button>
+          <button id="login-btn" class="form-submit" onclick="handleLogin()">Log ind</button>
           <button class="btn-back-login" onclick="switchTab('forgot')">Glemt adgangskode?</button>
         </div>
 
@@ -414,7 +414,7 @@
             <div class="form-group"><label>Email</label><input type="email" id="register-email" placeholder="din@email.dk"></div>
             <div class="form-group"><label>Adgangskode</label><input type="password" id="register-password" placeholder="Mindst 6 tegn"></div>
           </div>
-          <button class="form-submit" onclick="handleRegister()">Opret konto</button>
+          <button id="register-btn" class="form-submit" onclick="handleRegister()">Opret konto</button>
         </div>
       </div>
     </div>
@@ -465,7 +465,7 @@
               <input type="text" id="edit-shop-name" placeholder="f.eks. VeloShop ApS">
             </div>
           </div>
-          <button class="form-submit" onclick="saveProfile()">Gem ændringer</button>
+          <button id="save-profile-btn" class="form-submit" onclick="saveProfile()">Gem ændringer</button>
 
           <!-- ID Verificering -->
           <div class="id-verify-box" id="id-verify-box">
@@ -528,7 +528,7 @@
             <div id="thread-messages" class="thread-messages"></div>
             <div class="thread-reply">
               <textarea id="reply-text" placeholder="Skriv et svar..."></textarea>
-              <button onclick="sendReply()">Send svar</button>
+              <button id="send-reply-btn" onclick="sendReply()">Send svar</button>
             </div>
           </div>
         </div>
@@ -727,7 +727,7 @@
           <div id="inbox-modal-thread-messages" class="thread-messages"></div>
           <div class="thread-reply">
             <textarea id="inbox-modal-reply-text" placeholder="Skriv et svar..."></textarea>
-            <button onclick="sendInboxReply()">Send svar</button>
+            <button id="send-inbox-reply-btn" onclick="sendInboxReply()">Send svar</button>
           </div>
         </div>
 

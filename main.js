@@ -13,6 +13,22 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser    = null;
 let currentProfile = null;
 
+// Hjælper: deaktiver knap og vis spinner, returnerer gendan-funktion
+function btnLoading(id, label) {
+  const btn = document.getElementById(id);
+  if (!btn) return () => {};
+  btn.disabled = true;
+  btn.dataset.origText = btn.innerHTML;
+  btn.innerHTML = `<span class="btn-spinner"></span>${label}`;
+  return () => { btn.disabled = false; btn.innerHTML = btn.dataset.origText; };
+}
+
+// Hjælper: debounce
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
 // Pagination
 const BIKES_PAGE_SIZE = 24;
 let bikesOffset       = 0;
@@ -883,6 +899,8 @@ function selectType(type) {
 
 async function submitListing() {
   if (!currentUser) { showToast('⚠️ Log ind for at oprette en annonce'); return; }
+  const restore = btnLoading('submit-listing-btn', 'Opretter...');
+  try {
 
   // Hent felter specifikt fra opret-annonce modalen (#modal)
   const modalEl = document.getElementById('modal');
@@ -916,7 +934,7 @@ async function submitListing() {
   }
 
   const { data: newBike, error } = await supabase.from('bikes').insert(bikeData).select().single();
-  if (error) { showToast('❌ Noget gik galt – prøv igen'); console.error(error); return; }
+  if (error) { showToast('❌ Noget gik galt – prøv igen'); console.error(error); restore(); return; }
 
   // Upload billeder hvis der er valgt nogle
   if (selectedFiles.length > 0) {
@@ -929,6 +947,7 @@ async function submitListing() {
   showToast('✅ Din annonce er oprettet!');
   loadBikes();
   updateFilterCounts();
+  } finally { restore(); }
 }
 
 /* ============================================================
@@ -981,9 +1000,12 @@ async function handleLogin() {
   const email    = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   if (!email || !password) { showToast('⚠️ Udfyld email og adgangskode'); return; }
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) showToast('❌ Forkert email eller adgangskode');
-  else { closeLoginModal(); showToast('✅ Du er nu logget ind'); }
+  const restore = btnLoading('login-btn', 'Logger ind...');
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) showToast('❌ Forkert email eller adgangskode');
+    else { closeLoginModal(); showToast('✅ Du er nu logget ind'); }
+  } finally { restore(); }
 }
 
 async function handleRegister() {
@@ -991,9 +1013,13 @@ async function handleRegister() {
   const email    = document.getElementById('register-email').value;
   const password = document.getElementById('register-password').value;
   if (!name || !email || !password) { showToast('⚠️ Udfyld alle felter'); return; }
-  const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
-  if (error) showToast('❌ ' + error.message);
-  else { closeLoginModal(); showToast('✅ Tjek din email for at bekræfte kontoen'); }
+  if (password.length < 6) { showToast('⚠️ Adgangskode skal være mindst 6 tegn'); return; }
+  const restore = btnLoading('register-btn', 'Opretter konto...');
+  try {
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    if (error) showToast('❌ ' + error.message);
+    else { closeLoginModal(); showToast('✅ Tjek din email for at bekræfte kontoen'); }
+  } finally { restore(); }
 }
 
 /* ============================================================
@@ -1070,14 +1096,17 @@ async function saveProfile() {
     shop_name:   document.getElementById('edit-shop-name').value,
   };
 
-  const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
-  if (error) { showToast('❌ Kunne ikke gemme profil'); return; }
+  const restore = btnLoading('save-profile-btn', 'Gemmer...');
+  try {
+    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id);
+    if (error) { showToast('❌ Kunne ikke gemme profil'); return; }
 
-  // Opdater cache
-  currentProfile = { ...currentProfile, ...updates };
-  showProfileData();
-  updateNavAvatar(updates.name);
-  showToast('✅ Profil opdateret!');
+    // Opdater cache
+    currentProfile = { ...currentProfile, ...updates };
+    showProfileData();
+    updateNavAvatar(updates.name);
+    showToast('✅ Profil opdateret!');
+  } finally { restore(); }
 }
 
 async function loadMyListings() {
@@ -1364,56 +1393,68 @@ async function sendMessage(bikeId, receiverId) {
   const content = document.getElementById('message-text').value.trim();
   if (!content) { showToast('⚠️ Skriv en besked først'); return; }
 
-  const { data: inserted, error: insertError } = await supabase.from('messages').insert({
-    bike_id:     bikeId,
-    sender_id:   currentUser.id,
-    receiver_id: receiverId,
-    content,
-  }).select('id').single();
+  const btn = document.querySelector('#message-box button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sender...'; }
+  try {
+    const { data: inserted, error: insertError } = await supabase.from('messages').insert({
+      bike_id:     bikeId,
+      sender_id:   currentUser.id,
+      receiver_id: receiverId,
+      content,
+    }).select('id').single();
 
-  if (insertError) { showToast('❌ Kunne ikke sende besked'); console.error('Insert fejl:', insertError); return; }
+    if (insertError) { showToast('❌ Kunne ikke sende besked'); console.error('Insert fejl:', insertError); return; }
 
-  const textEl = document.getElementById('message-text');
-  const boxEl  = document.getElementById('message-box');
-  if (textEl) textEl.value = '';
-  if (boxEl)  boxEl.style.display = 'none';
-  showToast('✅ Besked sendt!');
+    const textEl = document.getElementById('message-text');
+    const boxEl  = document.getElementById('message-box');
+    if (textEl) textEl.value = '';
+    if (boxEl)  boxEl.style.display = 'none';
+    showToast('✅ Besked sendt!');
 
-  if (inserted?.id) {
-    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
-      .then(({ data: fnData, error: fnErr }) => {
-        console.log('notify-message svar:', fnData, fnErr);
-        if (fnErr) console.error('Email notifikation fejlede:', fnErr);
-      }).catch(err => console.error('Email notifikation fejlede:', err));
+    if (inserted?.id) {
+      supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
+        .then(({ data: fnData, error: fnErr }) => {
+          console.log('notify-message svar:', fnData, fnErr);
+          if (fnErr) console.error('Email notifikation fejlede:', fnErr);
+        }).catch(err => console.error('Email notifikation fejlede:', err));
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send besked'; }
   }
 }
 
 async function sendBid(bikeId, receiverId) {
   if (!currentUser) { showToast('⚠️ Log ind for at give bud'); return; }
   const amount = document.getElementById('bid-amount').value;
-  if (!amount) { showToast('⚠️ Indtast et bud'); return; }
+  if (!amount || isNaN(parseInt(amount)) || parseInt(amount) <= 0) { showToast('⚠️ Indtast et gyldigt bud'); return; }
 
   const content = `💰 Bud: ${parseInt(amount).toLocaleString('da-DK')} kr.`;
 
-  const { data: msgData, error } = await supabase.from('messages').insert({
-    bike_id:     bikeId,
-    sender_id:   currentUser.id,
-    receiver_id: receiverId,
-    content,
-  }).select('id').single();
+  const btn = document.querySelector('#bid-box button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sender...'; }
+  try {
+    const { data: msgData, error } = await supabase.from('messages').insert({
+      bike_id:     bikeId,
+      sender_id:   currentUser.id,
+      receiver_id: receiverId,
+      content,
+    }).select('id').single();
 
-  if (error) { showToast('❌ Kunne ikke sende bud'); return; }
-  document.getElementById('bid-amount').value = '';
-  document.getElementById('bid-box').style.display = 'none';
-  showToast('✅ Bud sendt til sælgeren!');
+    if (error) { showToast('❌ Kunne ikke sende bud'); return; }
+    document.getElementById('bid-amount').value = '';
+    document.getElementById('bid-box').style.display = 'none';
+    showToast('✅ Bud sendt til sælgeren!');
 
-  // Send email-notifikation til sælger via Edge Function
-  if (msgData?.id) {
-    supabase.functions.invoke('notify-message', {
-      body: { message_id: msgData.id },
-    }).then(({ error: fnErr }) => {
-      if (fnErr) console.error('Email notifikation fejlede:', fnErr);
-    }).catch(err => console.error('Email notifikation fejlede:', err));
+    // Send email-notifikation til sælger via Edge Function
+    if (msgData?.id) {
+      supabase.functions.invoke('notify-message', {
+        body: { message_id: msgData.id },
+      }).then(({ error: fnErr }) => {
+        if (fnErr) console.error('Email notifikation fejlede:', fnErr);
+      }).catch(err => console.error('Email notifikation fejlede:', err));
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send bud'; }
   }
 }
 
@@ -1577,22 +1618,25 @@ async function sendReply() {
   const content = document.getElementById('reply-text').value.trim();
   if (!content) { showToast('⚠️ Skriv et svar først'); return; }
 
-  const { data: inserted, error } = await supabase.from('messages').insert({
-    bike_id:     activeThread.bikeId,
-    sender_id:   currentUser.id,
-    receiver_id: activeThread.otherId,
-    content,
-  }).select('id').single();
+  const restore = btnLoading('send-reply-btn', 'Sender...');
+  try {
+    const { data: inserted, error } = await supabase.from('messages').insert({
+      bike_id:     activeThread.bikeId,
+      sender_id:   currentUser.id,
+      receiver_id: activeThread.otherId,
+      content,
+    }).select('id').single();
 
-  if (error) { showToast('❌ Kunne ikke sende svar'); return; }
-  document.getElementById('reply-text').value = '';
-  showToast('✅ Svar sendt!');
-  if (inserted?.id) {
-    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
-      .then(({ data: r, error: e }) => { console.log('notify-message:', r, e); })
-      .catch(e => console.error(e));
-  }
-  openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
+    if (error) { showToast('❌ Kunne ikke sende svar'); return; }
+    document.getElementById('reply-text').value = '';
+    showToast('✅ Svar sendt!');
+    if (inserted?.id) {
+      supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
+        .then(({ data: r, error: e }) => { console.log('notify-message:', r, e); })
+        .catch(e => console.error(e));
+    }
+    openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
+  } finally { restore(); }
 }
 
 
@@ -1637,8 +1681,13 @@ function applyFilters() {
   if (sellerDealer?.checked && !sellerPrivate?.checked) sellerType = 'dealer';
   if (sellerPrivate?.checked && !sellerDealer?.checked) sellerType = 'private';
 
-  loadBikesWithFilters({ types, conditions, minPrice, maxPrice, sellerType, wheelSizes });
+  debouncedLoadFilters({ types, conditions, minPrice, maxPrice, sellerType, wheelSizes });
 }
+
+const debouncedLoadFilters = debounce(
+  (args) => loadBikesWithFilters(args),
+  300
+);
 
 async function loadBikesWithFilters({ types = [], conditions = [], minPrice, maxPrice, sellerType, dealerId, wheelSizes = [] } = {}) {
   const grid = document.getElementById('listings-grid');
@@ -1975,15 +2024,16 @@ function removeImage(index) {
 async function uploadImages(bikeId) {
   if (selectedFiles.length === 0) return;
 
+  let failed = 0;
   for (const item of selectedFiles) {
     const ext      = item.file.name.split('.').pop();
     const filename = `${bikeId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('bike-images')
       .upload(filename, item.file, { contentType: item.file.type, upsert: false });
 
-    if (error) { console.error('Upload fejl:', error); continue; }
+    if (error) { console.error('Upload fejl:', error); failed++; continue; }
 
     const { data: { publicUrl } } = supabase.storage
       .from('bike-images')
@@ -1994,6 +2044,10 @@ async function uploadImages(bikeId) {
       url:        publicUrl,
       is_primary: item.isPrimary,
     });
+  }
+
+  if (failed > 0) {
+    showToast(`⚠️ ${failed} billede${failed > 1 ? 'r' : ''} kunne ikke uploades`);
   }
 
   // Ryd valgte filer
@@ -2294,22 +2348,25 @@ async function sendInboxReply() {
   const content = document.getElementById('inbox-modal-reply-text').value.trim();
   if (!content) { showToast('⚠️ Skriv et svar først'); return; }
 
-  const { data: inserted, error } = await supabase.from('messages').insert({
-    bike_id:     activeInboxThread.bikeId,
-    sender_id:   currentUser.id,
-    receiver_id: activeInboxThread.otherId,
-    content:     content,
-  }).select('id').single();
+  const restore = btnLoading('send-inbox-reply-btn', 'Sender...');
+  try {
+    const { data: inserted, error } = await supabase.from('messages').insert({
+      bike_id:     activeInboxThread.bikeId,
+      sender_id:   currentUser.id,
+      receiver_id: activeInboxThread.otherId,
+      content:     content,
+    }).select('id').single();
 
-  if (error) { showToast('❌ Kunne ikke sende svar'); return; }
-  document.getElementById('inbox-modal-reply-text').value = '';
-  showToast('✅ Svar sendt!');
-  if (inserted?.id) {
-    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
-      .then(({ data: r, error: e }) => { console.log('notify-message:', r, e); })
-      .catch(e => console.error(e));
-  }
-  openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
+    if (error) { showToast('❌ Kunne ikke sende svar'); return; }
+    document.getElementById('inbox-modal-reply-text').value = '';
+    showToast('✅ Svar sendt!');
+    if (inserted?.id) {
+      supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
+        .then(({ data: r, error: e }) => { console.log('notify-message:', r, e); })
+        .catch(e => console.error(e));
+    }
+    openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
+  } finally { restore(); }
 }
 
 async function updateInboxBadge() {

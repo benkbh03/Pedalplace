@@ -672,6 +672,15 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   font-family: 'DM Sans', sans-serif; transition: background 0.2s, transform 0.15s;
 }
 .form-submit:hover { background: var(--rust-light); transform: translateY(-1px); }
+.form-submit:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 7px;
+}
 
 /* Billede upload */
 .img-upload {
