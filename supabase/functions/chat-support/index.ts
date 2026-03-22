@@ -103,6 +103,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log("Anthropic svar:", JSON.stringify(data));
     const reply = data.content?.[0]?.text ?? "Beklager, jeg kunne ikke svare. Prøv igen.";
 
     return new Response(
