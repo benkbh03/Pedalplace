@@ -155,7 +155,7 @@ async function loadDealers() {
 
   // Hent forhandlere og cykelantal parallelt
   const [{ data: dealers, error }, { data: bikeRows }] = await Promise.all([
-    supabase.from('profiles').select('id, shop_name, city, name').eq('seller_type', 'dealer').eq('verified', true).order('created_at', { ascending: true }),
+    supabase.from('profiles').select('id, shop_name, city, address, name').eq('seller_type', 'dealer').eq('verified', true).order('created_at', { ascending: true }),
     supabase.from('bikes').select('user_id').eq('is_active', true)
   ]);
 
@@ -216,13 +216,13 @@ function buildDealerCard(dealer, countMap, featured = false) {
   const displayName   = dealer.shop_name || dealer.name || 'Forhandler';
   const initials      = displayName.substring(0, 2).toUpperCase();
   const bikeCount     = countMap[dealer.id] || 0;
-  const cityText      = dealer.city || '';
+  const locationText  = dealer.address && dealer.city ? `${dealer.address}, ${dealer.city}` : dealer.address || dealer.city || '';
   const featuredClass = featured ? ' dealer-card--featured' : '';
   return `
     <div class="dealer-card${featuredClass}" onclick="openUserProfile('${dealer.id}')" style="cursor:pointer;" title="Se ${displayName}s profil">
       <div class="dealer-logo-circle">${initials}</div>
       <div class="dealer-name">${displayName} <span class="dealer-verified-tick" title="Verificeret forhandler">✓</span></div>
-      ${cityText ? `<div class="dealer-city">📍 ${cityText}</div>` : ''}
+      ${locationText ? `<div class="dealer-city">📍 ${locationText}</div>` : ''}
       <div class="dealer-count">${bikeCount} ${bikeCount === 1 ? 'cykel' : 'cykler'} til salg</div>
     </div>
   `;
@@ -398,7 +398,7 @@ async function openUserProfile(userId) {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
     const [r1, r2, r3, r4] = await Promise.all([
-      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, verified, id_verified, created_at').eq('id', userId).single()),
+      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at').eq('id', userId).single()),
       safe(supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
@@ -518,7 +518,7 @@ async function openUserProfile(userId) {
           ${profile.verified ? '<span class="verified-badge-large" title="Verificeret forhandler">✓</span>' : ''}
           ${profile.id_verified ? '<span class="id-badge" title="ID verificeret">🪪</span>' : ''}
         </h2>
-        ${profile.city ? `<div class="up-city">📍 ${profile.city}</div>` : ''}
+        ${isDealer && profile.address ? `<div class="up-city">📍 ${profile.address}${profile.city ? ', ' + profile.city : ''}</div>` : profile.city ? `<div class="up-city">📍 ${profile.city}</div>` : ''}
         <div class="up-badges">
           <span class="badge ${isDealer ? 'badge-dealer' : 'badge-private'}">${isDealer ? '🏪 Forhandler' : '👤 Privat sælger'}</span>
           ${memberYear ? `<span class="up-member-since">Medlem siden ${memberYear}</span>` : ''}
@@ -1057,12 +1057,18 @@ function showProfileData() {
   document.getElementById('edit-city').value        = profile.city || '';
   document.getElementById('edit-seller-type').value = profile.seller_type || 'private';
   document.getElementById('edit-shop-name').value   = profile.shop_name || '';
+  document.getElementById('edit-address').value     = profile.address || '';
 
-  const shopGroup = document.getElementById('edit-shop-group');
-  shopGroup.style.display = profile.seller_type === 'dealer' ? 'flex' : 'none';
+  const shopGroup    = document.getElementById('edit-shop-group');
+  const addressGroup = document.getElementById('edit-address-group');
+  const isDealer = profile.seller_type === 'dealer';
+  shopGroup.style.display    = isDealer ? 'flex' : 'none';
+  addressGroup.style.display = isDealer ? 'flex' : 'none';
 
   document.getElementById('edit-seller-type').onchange = function () {
-    shopGroup.style.display = this.value === 'dealer' ? 'flex' : 'none';
+    const dealer = this.value === 'dealer';
+    shopGroup.style.display    = dealer ? 'flex' : 'none';
+    addressGroup.style.display = dealer ? 'flex' : 'none';
   };
   updateIdVerifyUI();
 }
@@ -1086,6 +1092,7 @@ async function saveProfile() {
     city:        document.getElementById('edit-city').value,
     seller_type: document.getElementById('edit-seller-type').value,
     shop_name:   document.getElementById('edit-shop-name').value,
+    address:     document.getElementById('edit-address').value,
   };
 
   const restore = btnLoading('save-profile-btn', 'Gemmer...');
@@ -2100,6 +2107,7 @@ async function submitDealerApplication() {
   const contact  = document.getElementById('dealer-contact').value.trim();
   const email    = document.getElementById('dealer-email').value.trim();
   const phone    = document.getElementById('dealer-phone').value.trim();
+  const address  = document.getElementById('dealer-address').value.trim();
   const city     = document.getElementById('dealer-city').value.trim();
 
   if (!shopName || !cvr || !contact || !email) {
@@ -2112,6 +2120,7 @@ async function submitDealerApplication() {
       shop_name:   shopName,
       cvr:         cvr,
       phone:       phone,
+      address:     address,
       city:        city,
       seller_type: 'dealer',
     }).eq('id', currentUser.id);
@@ -2123,7 +2132,7 @@ async function submitDealerApplication() {
   showToast('✅ Ansøgning modtaget! Vi kontakter dig inden for 2 hverdage.');
 
   // Ryd felter
-  ['dealer-shop-name','dealer-cvr','dealer-contact','dealer-email','dealer-phone','dealer-city']
+  ['dealer-shop-name','dealer-cvr','dealer-contact','dealer-email','dealer-phone','dealer-address','dealer-city']
     .forEach(function(id) { document.getElementById(id).value = ''; });
 }
 
