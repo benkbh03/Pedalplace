@@ -807,14 +807,6 @@ async function updateFilterCounts() {
   const statDealers = document.getElementById('stat-dealers');
   if (statDealers) statDealers.textContent = dealerCount > 0 ? dealerCount.toLocaleString('da-DK') : '0';
 
-  // Hent antal solgte cykler (gennemførte handler)
-  const { count: soldCount } = await supabase
-    .from('bikes')
-    .select('id', { count: 'exact', head: true })
-    .eq('is_active', false);
-
-  const statSold = document.getElementById('stat-sold');
-  if (statSold) statSold.textContent = (soldCount || 0).toLocaleString('da-DK') + (soldCount > 0 ? '+' : '');
 }
 
 function setCount(label, count) {
