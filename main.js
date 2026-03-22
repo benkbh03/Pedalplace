@@ -13,12 +13,23 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser    = null;
 let currentProfile = null;
 
+// Pagination
+const BIKES_PAGE_SIZE = 24;
+let bikesOffset       = 0;
+let currentFilters    = {};
+
 /* ============================================================
    INIT – hent session én gang og sæt alt op
    ============================================================ */
 
 async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
+  // Start offentlig data med det samme – venter ikke på auth
+  const sessionPromise = supabase.auth.getSession();
+  loadBikes();
+  loadDealers();
+  updateFilterCounts();
+
+  const { data: { session } } = await sessionPromise;
 
   if (session) {
     currentUser = session.user;
@@ -52,10 +63,6 @@ async function init() {
       updateNav(false);
     }
   });
-
-  loadBikes();
-  loadDealers();
-  updateFilterCounts();
 
   // Åbn indbakke automatisk hvis ?inbox=true er i URL'en
   if (new URLSearchParams(window.location.search).get('inbox') === 'true' && currentUser) {
@@ -130,12 +137,11 @@ async function loadDealers() {
   const container = document.getElementById('dealer-cards-container');
   if (!container) return;
 
-  const { data: dealers, error } = await supabase
-    .from('profiles')
-    .select('id, shop_name, city, name')
-    .eq('seller_type', 'dealer')
-    .eq('verified', true)
-    .order('created_at', { ascending: true });
+  // Hent forhandlere og cykelantal parallelt
+  const [{ data: dealers, error }, { data: bikeRows }] = await Promise.all([
+    supabase.from('profiles').select('id, shop_name, city, name').eq('seller_type', 'dealer').eq('verified', true).order('created_at', { ascending: true }),
+    supabase.from('bikes').select('user_id').eq('is_active', true)
+  ]);
 
   if (error || !dealers || dealers.length === 0) {
     container.className = 'dealer-cards dealer-empty-state';
@@ -150,17 +156,14 @@ async function loadDealers() {
     return;
   }
 
-  // Hent antal cykler per forhandler
-  const dealerIds = dealers.map(d => d.id);
-  const { data: bikeRows } = await supabase
-    .from('bikes')
-    .select('user_id')
-    .in('user_id', dealerIds);
+  const dealerIdSet = new Set(dealers.map(d => d.id));
 
   const countMap = {};
   if (bikeRows) {
     for (const b of bikeRows) {
-      countMap[b.user_id] = (countMap[b.user_id] || 0) + 1;
+      if (dealerIdSet.has(b.user_id)) {
+        countMap[b.user_id] = (countMap[b.user_id] || 0) + 1;
+      }
     }
   }
 
@@ -602,14 +605,23 @@ function closeUserProfileModal() {
    ANNONCER
    ============================================================ */
 
-async function loadBikes(filters = {}) {
+async function loadBikes(filters = {}, append = false) {
   const grid = document.getElementById('listings-grid');
-  grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
+
+  if (!append) {
+    bikesOffset    = 0;
+    currentFilters = filters;
+    grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
+    // Fjern evt. eksisterende "Vis flere"-knap
+    const old = document.getElementById('load-more-btn');
+    if (old) old.remove();
+  }
 
   let query = supabase
     .from('bikes')
     .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(bikesOffset, bikesOffset + BIKES_PAGE_SIZE - 1);
 
   if (filters.type)       query = query.eq('type', filters.type);
   if (filters.maxPrice)   query = query.lte('price', filters.maxPrice);
@@ -621,17 +633,34 @@ async function loadBikes(filters = {}) {
 
   if (error) {
     console.error('loadBikes fejl:', error);
-    grid.innerHTML = '<p style="color:var(--rust);padding:20px">Kunne ikke hente annoncer.</p>';
+    if (!append) grid.innerHTML = '<p style="color:var(--rust);padding:20px">Kunne ikke hente annoncer.</p>';
     return;
   }
 
-  renderBikes(data);
+  if (append) {
+    renderBikes(data, true);
+  } else {
+    renderBikes(data);
+  }
+
+  bikesOffset += data.length;
+
+  // Vis "Vis flere"-knap hvis der kan være flere
+  const existing = document.getElementById('load-more-btn');
+  if (existing) existing.remove();
+
+  if (data.length === BIKES_PAGE_SIZE) {
+    const btn = document.createElement('div');
+    btn.id        = 'load-more-btn';
+    btn.innerHTML = `<button onclick="loadBikes(currentFilters, true)" style="display:block;margin:24px auto;padding:12px 32px;background:var(--forest);color:#fff;border:none;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Vis flere cykler</button>`;
+    grid.after(btn);
+  }
 }
 
-function renderBikes(bikes) {
+function renderBikes(bikes, append = false) {
   const grid = document.getElementById('listings-grid');
 
-  if (!bikes || bikes.length === 0) {
+  if (!append && (!bikes || bikes.length === 0)) {
     grid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:60px 20px;">
         <div style="font-size:4rem;margin-bottom:16px;">🚲</div>
@@ -642,7 +671,10 @@ function renderBikes(bikes) {
     return;
   }
 
-  grid.innerHTML = bikes.map((b, i) => {
+  if (!bikes || bikes.length === 0) return;
+
+  const startIndex = append ? grid.querySelectorAll('.bike-card').length : 0;
+  const html = bikes.map((b, i) => {
     const profile    = b.profiles || {};
     const sellerType = profile.seller_type || 'private';
     const sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
@@ -654,7 +686,7 @@ function renderBikes(bikes) {
 
     var isSold = !b.is_active;
     return `
-      <div class="bike-card" style="animation-delay:${i * 50}ms;${isSold ? 'opacity:0.7' : ''}" onclick="${isSold ? '' : "openBikeModal('" + b.id + "')"}">
+      <div class="bike-card" style="animation-delay:${(startIndex + i) * 50}ms;${isSold ? 'opacity:0.7' : ''}" onclick="${isSold ? '' : "openBikeModal('" + b.id + "')"}">
         <div class="bike-card-img">
           ${imgContent}
           ${isSold ? '<div class="sold-tag"><span>SOLGT</span></div>' : ''}
@@ -685,6 +717,12 @@ function renderBikes(bikes) {
         </div>
       </div>`;
   }).join('');
+
+  if (append) {
+    grid.insertAdjacentHTML('beforeend', html);
+  } else {
+    grid.innerHTML = html;
+  }
 }
 
 function searchBikes() {
@@ -1588,12 +1626,15 @@ function applyFilters() {
 async function loadBikesWithFilters({ types = [], conditions = [], minPrice, maxPrice, sellerType, dealerId, wheelSizes = [] } = {}) {
   const grid = document.getElementById('listings-grid');
   grid.innerHTML = '<p style="color:var(--muted);padding:20px">Henter annoncer...</p>';
+  const old = document.getElementById('load-more-btn');
+  if (old) old.remove();
 
   let query = supabase
     .from('bikes')
     .select('*, profiles(name, seller_type, shop_name), bike_images(url, is_primary)')
     .eq('is_active', true)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(96);
 
   if (types.length > 0)      query = query.in('type', types);
   if (conditions.length > 0) query = query.in('condition', conditions);
