@@ -712,12 +712,12 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .toast.show { transform: translateY(0); opacity: 1; }
 
 /* ── AI SUPPORT CHAT WIDGET ── */
-#chat-widget { position: fixed; bottom: 28px; right: 28px; z-index: 400; display: flex; flex-direction: column; align-items: flex-end; }
+#chat-widget { position: fixed; bottom: 28px; right: 28px; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; }
 
 #chat-toggle {
   width: 56px; height: 56px; border-radius: 50%;
-  background: var(--rust); color: #fff; border: none; cursor: pointer;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+  background: var(--rust); color: #fff; border: 3px solid #fff; cursor: pointer;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.45);
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s, transform 0.2s;
 }
