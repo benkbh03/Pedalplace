@@ -820,6 +820,31 @@
   <!-- ── TOAST BESKED ── -->
   <div class="toast" id="toast">✅ Din annonce er oprettet!</div>
 
+  <!-- ── AI SUPPORT CHAT ── -->
+  <div id="chat-widget">
+    <button id="chat-toggle" onclick="toggleChat()" aria-label="Åbn support chat">
+      <svg id="chat-icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      <svg id="chat-icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="display:none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div id="chat-window">
+      <div id="chat-header">
+        <span>🚲 Support</span>
+        <span id="chat-subtitle">Spørg mig om alt</span>
+      </div>
+      <div id="chat-messages">
+        <div class="chat-msg chat-msg--bot">
+          <div class="chat-bubble">Hej! Jeg er Cykelbørsens AI-assistent. Hvad kan jeg hjælpe dig med? 😊</div>
+        </div>
+      </div>
+      <div id="chat-input-area">
+        <textarea id="chat-input" placeholder="Skriv dit spørgsmål..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+        <button id="chat-send-btn" onclick="sendChatMessage()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="main.js"></script>
 </body>
