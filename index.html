@@ -310,15 +310,22 @@
 
   <!-- ── BLIV FORHANDLER MODAL ── -->
   <div class="modal-overlay" id="dealer-modal">
-    <div class="modal" style="max-width:520px;">
+    <div class="modal" style="max-width:560px;">
       <div class="modal-header">
         <h2>Bliv forhandler</h2>
         <button class="modal-close" onclick="closeBecomeDealerModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:.9rem;color:var(--muted);margin-bottom:22px;line-height:1.6;">
-          Få din cykelbutik på Danmarks voksende cykelmarked. Gratis at komme i gang — betal kun når det virker.
+        <p style="font-size:.9rem;color:var(--muted);margin-bottom:18px;line-height:1.6;">
+          Få din cykelbutik på Danmarks voksende cykelmarked.
         </p>
+
+        <!-- ── Gratis prøveperiode banner ── -->
+        <div class="dealer-trial-banner">
+          🎉 <strong>Tilbud til nye forhandlere:</strong> 3 måneder gratis — ingen binding, annuller når som helst.
+        </div>
+
+        <!-- ── Fordele ── -->
         <div class="dealer-perks">
           <div class="dealer-perk">✅ <span>Ubegrænset antal annoncer</span></div>
           <div class="dealer-perk">✅ <span>Verificeret forhandler-badge</span></div>
@@ -326,17 +333,36 @@
           <div class="dealer-perk">✅ <span>Statistik og salgsdata</span></div>
           <div class="dealer-perk">✅ <span>Prioriteret placering i søgning</span></div>
         </div>
-        <div class="form-grid" style="grid-template-columns:1fr;margin-top:22px;">
+
+        <!-- ── Prisplan-vælger ── -->
+        <div class="dealer-plans" role="group" aria-label="Vælg abonnementsplan">
+          <button class="dealer-plan-btn selected" data-plan="monthly" onclick="selectDealerPlan(this)" type="button">
+            <div class="plan-name">Månedlig</div>
+            <div class="plan-price">199 <span class="plan-unit">kr./md</span></div>
+            <div class="plan-note">3 mdr. gratis herefter</div>
+          </button>
+          <button class="dealer-plan-btn" data-plan="yearly" onclick="selectDealerPlan(this)" type="button">
+            <div class="plan-badge">Spar 37%</div>
+            <div class="plan-name">Årlig</div>
+            <div class="plan-price">1.499 <span class="plan-unit">kr./år</span></div>
+            <div class="plan-note">svarende til 125 kr./md</div>
+          </button>
+        </div>
+
+        <!-- ── Ansøgningsformular ── -->
+        <div class="form-grid" style="grid-template-columns:1fr;margin-top:20px;">
           <div class="form-group"><label>Butiksnavn *</label><input type="text" id="dealer-shop-name" placeholder="f.eks. VeloShop ApS"></div>
-          <div class="form-group"><label>CVR-nummer *</label><input type="text" id="dealer-cvr" placeholder="f.eks. 12345678"></div>
+          <div class="form-group"><label>CVR-nummer *</label><input type="text" id="dealer-cvr" placeholder="f.eks. 12345678" maxlength="8"></div>
           <div class="form-group"><label>Kontaktperson *</label><input type="text" id="dealer-contact" placeholder="Dit fulde navn"></div>
           <div class="form-group"><label>Email *</label><input type="email" id="dealer-email" placeholder="din@butik.dk"></div>
           <div class="form-group"><label>Telefon</label><input type="text" id="dealer-phone" placeholder="f.eks. 12 34 56 78"></div>
           <div class="form-group"><label>Adresse</label><input type="text" id="dealer-address" placeholder="f.eks. Vesterbrogade 42"></div>
           <div class="form-group"><label>By</label><input type="text" id="dealer-city" placeholder="f.eks. København"></div>
         </div>
-        <button class="form-submit" onclick="submitDealerApplication()">Send ansøgning</button>
-        <p style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:12px;">Vi kontakter dig inden for 2 hverdage.</p>
+        <button class="form-submit" id="dealer-submit-btn" onclick="submitDealerApplication()">Fortsæt til betaling →</button>
+        <p style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:10px;">
+          Betaling via Stripe — kort og MobilePay accepteres. Ingen binding.
+        </p>
       </div>
     </div>
   </div>
@@ -522,6 +548,20 @@
             </div>
           </div>
           <button id="save-profile-btn" class="form-submit" onclick="saveProfile()">Gem ændringer</button>
+
+          <!-- Forhandlerabonnement -->
+          <div class="subscription-box" id="subscription-box" style="display:none;">
+            <div class="subscription-header">
+              <div>
+                <div class="subscription-title">🏪 Forhandlerabonnement</div>
+                <div class="subscription-sub">Administrer dit aktive abonnement</div>
+              </div>
+              <span id="subscription-status-badge" class="sub-status-active">Aktivt</span>
+            </div>
+            <button class="btn-manage-subscription" id="btn-manage-subscription" onclick="openSubscriptionPortal()">
+              Administrer abonnement →
+            </button>
+          </div>
 
           <!-- ID Verificering -->
           <div class="id-verify-box" id="id-verify-box">

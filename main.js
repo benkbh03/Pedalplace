@@ -134,6 +134,24 @@ async function init() {
     openBikeModal(sharedBikeId);
   }
 
+  // Håndter returnering fra Stripe Checkout
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('dealer_success') === 'true') {
+    history.replaceState(null, '', window.location.pathname);
+    // Genindlæs profil så verified-status er opdateret
+    if (currentUser) {
+      const { data: freshProfile } = await supabase
+        .from('profiles').select('*').eq('id', currentUser.id).single();
+      currentProfile = freshProfile;
+      updateNav(true, freshProfile?.name, freshProfile?.avatar_url);
+    }
+    showToast('🎉 Velkommen som forhandler! Din 3-måneders gratis periode er startet.');
+    setTimeout(() => openProfileModal(), 600);
+  } else if (urlParams.get('dealer_cancel') === 'true') {
+    history.replaceState(null, '', window.location.pathname);
+    showToast('ℹ️ Betalingen blev annulleret. Du kan prøve igen når du er klar.');
+  }
+
   // Klik uden for modal lukker den
   document.getElementById('inbox-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeInboxModal();
@@ -1164,6 +1182,25 @@ function showProfileData() {
   const isDealer = profile.seller_type === 'dealer';
   shopGroup.style.display    = isDealer ? 'flex' : 'none';
   addressGroup.style.display = isDealer ? 'flex' : 'none';
+
+  // Vis abonnementsboks for forhandlere med Stripe-kunde
+  const subBox = document.getElementById('subscription-box');
+  if (subBox) {
+    const hasSubscription = isDealer && profile.stripe_customer_id;
+    subBox.style.display = hasSubscription ? 'block' : 'none';
+    if (hasSubscription) {
+      const badge  = document.getElementById('subscription-status-badge');
+      const status = profile.stripe_subscription_status || 'active';
+      const labels = {
+        active:     { text: 'Aktivt',    cls: 'sub-status-active'  },
+        trialing:   { text: '3 mdr. fri',cls: 'sub-status-trial'   },
+        past_due:   { text: 'Forfaldent',cls: 'sub-status-past-due'},
+        canceled:   { text: 'Annulleret',cls: 'sub-status-canceled'},
+      };
+      const { text, cls } = labels[status] || { text: status, cls: 'sub-status-active' };
+      if (badge) { badge.textContent = text; badge.className = cls; }
+    }
+  }
 
   document.getElementById('edit-seller-type').onchange = function () {
     const dealer = this.value === 'dealer';
@@ -2305,7 +2342,19 @@ function closeBecomeDealerModal() {
   disableFocusTrap('dealer-modal');
 }
 
+function selectDealerPlan(btn) {
+  document.querySelectorAll('.dealer-plan-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
 async function submitDealerApplication() {
+  if (!currentUser) {
+    closeBecomeDealerModal();
+    openLoginModal();
+    showToast('⚠️ Log ind for at blive forhandler');
+    return;
+  }
+
   const shopName = document.getElementById('dealer-shop-name').value.trim();
   const cvr      = document.getElementById('dealer-cvr').value.trim();
   const contact  = document.getElementById('dealer-contact').value.trim();
@@ -2313,31 +2362,67 @@ async function submitDealerApplication() {
   const phone    = document.getElementById('dealer-phone').value.trim();
   const address  = document.getElementById('dealer-address').value.trim();
   const city     = document.getElementById('dealer-city').value.trim();
+  const plan     = document.querySelector('.dealer-plan-btn.selected')?.dataset.plan || 'monthly';
 
   if (!shopName || !cvr || !contact || !email) {
     showToast('⚠️ Udfyld alle påkrævede felter (*)'); return;
   }
 
-  // Gem ansøgning som besked til admin eller gem i profiles hvis logget ind
-  if (currentUser) {
-    const { error } = await supabase.from('profiles').update({
-      shop_name:   shopName,
-      cvr:         cvr,
-      phone:       phone,
-      address:     address,
-      city:        city,
-      seller_type: 'dealer',
-    }).eq('id', currentUser.id);
+  const restore = btnLoading('dealer-submit-btn', 'Forbereder betaling...');
 
-    if (error) { showToast('❌ Noget gik galt – prøv igen'); return; }
+  // Gem butiksinformation i profil
+  const { error: profileError } = await supabase.from('profiles').update({
+    shop_name:   shopName,
+    cvr:         cvr,
+    phone:       phone,
+    address:     address,
+    city:        city,
+    seller_type: 'dealer',
+  }).eq('id', currentUser.id);
+
+  if (profileError) {
+    restore();
+    showToast('❌ Noget gik galt – prøv igen');
+    return;
   }
 
-  closeBecomeDealerModal();
-  showToast('✅ Ansøgning modtaget! Vi kontakter dig inden for 2 hverdage.');
+  // Opret Stripe Checkout session via Edge Function
+  const { data, error: fnError } = await supabase.functions.invoke('create-checkout-session', {
+    body: {
+      plan,
+      user_id:     currentUser.id,
+      email:       email || currentUser.email,
+      success_url: window.location.origin + window.location.pathname,
+      cancel_url:  window.location.origin + window.location.pathname,
+    },
+  });
 
-  // Ryd felter
-  ['dealer-shop-name','dealer-cvr','dealer-contact','dealer-email','dealer-phone','dealer-address','dealer-city']
-    .forEach(function(id) { document.getElementById(id).value = ''; });
+  restore();
+
+  if (fnError || data?.error) {
+    showToast('❌ Kunne ikke starte betaling — ' + (data?.error || fnError?.message || 'prøv igen'));
+    return;
+  }
+
+  // Redirect til Stripe Checkout (åbner i samme fane)
+  window.location.href = data.url;
+}
+
+async function openSubscriptionPortal() {
+  if (!currentUser) return;
+  const restore = btnLoading('btn-manage-subscription', 'Åbner portal...');
+  const { data, error } = await supabase.functions.invoke('create-portal-session', {
+    body: {
+      user_id:    currentUser.id,
+      return_url: window.location.origin + window.location.pathname,
+    },
+  });
+  restore();
+  if (error || data?.error) {
+    showToast('❌ ' + (data?.error || 'Kunne ikke åbne abonnements-portal'));
+    return;
+  }
+  window.location.href = data.url;
 }
 
 /* ============================================================
@@ -2586,6 +2671,8 @@ window.closeFooterModal        = closeFooterModal;
 window.submitContactForm       = submitContactForm;
 window.closeBecomeDealerModal  = closeBecomeDealerModal;
 window.submitDealerApplication = submitDealerApplication;
+window.selectDealerPlan        = selectDealerPlan;
+window.openSubscriptionPortal  = openSubscriptionPortal;
 window.closeInboxModal  = closeInboxModal;
 window.openInboxThread  = openInboxThread;
 window.closeInboxThread = closeInboxThread;
