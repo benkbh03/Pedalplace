@@ -150,6 +150,27 @@ async function init() {
   document.getElementById('share-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeShareModal();
   });
+
+  // Global Escape-tast: lukker den øverste åbne modal
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    // Tjek modaler i prioriteret rækkefølge (inderste/øverste først)
+    if (document.getElementById('share-modal')?.classList.contains('open'))      { closeShareModal(); return; }
+    if (document.getElementById('admin-modal')?.classList.contains('open'))      { closeAdminPanel(); return; }
+    if (document.getElementById('edit-modal')?.classList.contains('open'))       { closeEditModal(); return; }
+    if (document.getElementById('bike-modal')?.classList.contains('open'))       { closeBikeModal(); return; }
+    if (document.getElementById('map-bike-modal')?.classList.contains('open'))   { closeMapBikeModal(); return; }
+    if (document.getElementById('inbox-modal')?.classList.contains('open'))      { closeInboxModal(); return; }
+    if (document.getElementById('profile-modal')?.classList.contains('open'))    { closeProfileModal(); return; }
+    if (document.getElementById('modal')?.classList.contains('open'))            { closeModal(); return; }
+    if (document.getElementById('login-modal')?.classList.contains('open'))      { closeLoginModal(); return; }
+    if (document.getElementById('dealer-modal')?.classList.contains('open'))     { closeBecomeDealerModal(); return; }
+    if (document.getElementById('footer-modal')?.classList.contains('open'))     { closeFooterModal(); return; }
+    // display:flex-baserede modaler
+    if (document.getElementById('user-profile-modal')?.style.display === 'flex')   { closeUserProfileModal(); return; }
+    if (document.getElementById('dealer-profile-modal')?.style.display === 'flex') { closeDealerProfileModal(); return; }
+    if (document.getElementById('all-dealers-modal')?.style.display === 'flex')    { closeAllDealersModal(); return; }
+  });
 }
 
 function updateNav(loggedIn, name, avatarUrl) {
@@ -391,7 +412,7 @@ async function openDealerProfile(dealerId) {
     const avatarInit = (sellerName).substring(0, 2).toUpperCase();
     const primaryImg = b.bike_images?.find(img => img.is_primary)?.url;
     const imgContent = primaryImg
-      ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}" style="width:100%;height:100%;object-fit:cover;">`
+      ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
       : '<span style="font-size:4rem">🚲</span>';
     return `
       <div class="bike-card" style="animation-delay:${i * 50}ms" onclick="openBikeModal('${b.id}')">
@@ -751,7 +772,7 @@ function renderBikes(bikes, append = false) {
     const initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
     const primaryImg = b.bike_images?.find(img => img.is_primary)?.url;
     const imgContent = primaryImg
-      ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}" style="width:100%;height:100%;object-fit:cover;">`
+      ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
       : '<span style="font-size:4rem">🚲</span>';
 
     var isSold = !b.is_active;
@@ -893,8 +914,12 @@ async function toggleSave(btn, bikeId) {
    ============================================================ */
 
 function togglePill(el) {
-  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.pill').forEach(p => {
+    p.classList.remove('active');
+    p.setAttribute('aria-pressed', 'false');
+  });
   el.classList.add('active');
+  el.setAttribute('aria-pressed', 'true');
   const text = el.textContent.trim();
   if      (text === 'Alle')            loadBikes();
   else if (text === 'El-cykler')       loadBikes({ type: 'El-cykel' });
@@ -904,6 +929,16 @@ function togglePill(el) {
   else if (text === 'Med garanti')     loadBikes({ warranty: true });
   else if (text === 'Ny annonce')      loadBikes({ newOnly: true });
 }
+
+// Keyboard-aktivering af filterpills (Enter/Space)
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      togglePill(pill);
+    }
+  });
+});
 
 /* ============================================================
    OPRET ANNONCE MODAL
@@ -1352,7 +1387,7 @@ async function openBikeModal(bikeId) {
   } else {
     const thumbsHtml = allImages.map((img, i) => `
       <button class="gallery-thumb${i === 0 ? ' active' : ''}" onclick="galleryGoto(${i})" aria-label="Billede ${i + 1}">
-        <img src="${img.url}" alt="Billede ${i + 1}">
+        <img src="${img.url}" alt="Billede ${i + 1}" loading="lazy">
       </button>`).join('');
     galleryHtml = `
       <div class="bike-gallery">
@@ -1369,6 +1404,28 @@ async function openBikeModal(bikeId) {
   const isOwner = currentUser && currentUser.id === profile.id;
 
   document.getElementById('bike-modal-title').textContent = `${b.brand} ${b.model}`;
+
+  // Dynamisk SEO: opdater document.title og OG-tags
+  const _origTitle = document.title;
+  document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
+  const _setMeta = (prop, val) => {
+    let el = document.querySelector(`meta[property="${prop}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
+    el.setAttribute('content', val);
+  };
+  _setMeta('og:title', `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr.`);
+  _setMeta('og:description', b.description || `${b.type} · ${b.condition}${b.city ? ' · ' + b.city : ''} – til salg på Cykelbørsen`);
+  const _primaryImgUrl = allImages[0]?.url;
+  if (_primaryImgUrl) _setMeta('og:image', _primaryImgUrl);
+  // Gem original og:title/description til gendannelse ved lukning
+  document.getElementById('bike-modal')._restoreTitle = () => {
+    document.title = _origTitle;
+    // Fjern dynamisk tilsatte og:image tag hvis det ikke var der i forvejen
+    const ogImage = document.querySelector('meta[property="og:image"]');
+    if (ogImage && !ogImage.dataset.static) ogImage.remove();
+    _setMeta('og:title', 'Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark');
+    _setMeta('og:description', 'Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce.');
+  };
 
   document.getElementById('bike-modal-body').innerHTML = `
     <div class="bike-detail-grid">
@@ -1428,8 +1485,13 @@ async function openBikeModal(bikeId) {
 }
 
 function closeBikeModal() {
-  document.getElementById('bike-modal').classList.remove('open');
+  const modal = document.getElementById('bike-modal');
+  modal.classList.remove('open');
   document.body.style.overflow = '';
+  if (typeof modal._restoreTitle === 'function') {
+    modal._restoreTitle();
+    modal._restoreTitle = null;
+  }
 }
 document.getElementById('bike-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeBikeModal();
@@ -2787,7 +2849,11 @@ async function searchAutocomplete(query) {
       .or('brand.ilike.%' + query + '%,model.ilike.%' + query + '%,title.ilike.%' + query + '%')
       .limit(8);
 
-    if (!result.data || result.data.length === 0) { list.style.display = 'none'; return; }
+    if (!result.data || result.data.length === 0) {
+      list.innerHTML = '<div class="autocomplete-no-results">Ingen resultater for "<strong>' + query.replace(/</g, '&lt;') + '</strong>"</div>';
+      list.style.display = 'block';
+      return;
+    }
 
     // Deduplikér brand+model kombinationer
     var seen = {};

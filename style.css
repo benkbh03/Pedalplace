@@ -950,7 +950,8 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   .search-bar { flex-direction: column; gap: 10px; border-radius: 12px; padding: 14px; }
   .search-bar input, .search-bar select, .search-bar button { width: 100%; border-radius: 8px; font-size: 0.9rem; }
   .search-bar button { padding: 12px; }
-  .filters-row { padding: 12px 16px; gap: 8px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .filters-row { padding: 12px 16px; gap: 8px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .filters-row::-webkit-scrollbar { display: none; }
   .filters-label { display: none; }
   .pill { flex-shrink: 0; font-size: 0.8rem; padding: 7px 14px; }
   .main { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
@@ -1100,6 +1101,12 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .autocomplete-item:hover, .autocomplete-item.active { background: var(--sand); }
 .autocomplete-item strong { color: var(--rust); }
 .autocomplete-meta { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+.autocomplete-no-results {
+  padding: 14px 16px;
+  font-size: 0.86rem;
+  color: var(--muted);
+  text-align: center;
+}
 
 /* ── DEL ANNONCE ── */
 .share-buttons {
