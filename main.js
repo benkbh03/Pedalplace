@@ -29,6 +29,47 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+// Hjælper: focus trap — returnerer cleanup-funktion
+function trapFocus(modalEl) {
+  const focusable = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const els = () => Array.from(modalEl.querySelectorAll(focusable));
+  const first = () => els()[0];
+  const last  = () => els()[els().length - 1];
+
+  function onKeyDown(e) {
+    if (e.key !== 'Tab') return;
+    const all = els();
+    if (!all.length) return;
+    if (e.shiftKey) {
+      if (document.activeElement === first()) { e.preventDefault(); last().focus(); }
+    } else {
+      if (document.activeElement === last())  { e.preventDefault(); first().focus(); }
+    }
+  }
+
+  modalEl.addEventListener('keydown', onKeyDown);
+  // Sæt fokus på første fokuserbare element
+  requestAnimationFrame(() => { const f = first(); if (f) f.focus(); });
+  return () => modalEl.removeEventListener('keydown', onKeyDown);
+}
+
+// Map: modal-id → cleanup-funktion
+const _focusTrapCleanup = {};
+
+function enableFocusTrap(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  if (_focusTrapCleanup[modalId]) _focusTrapCleanup[modalId]();
+  _focusTrapCleanup[modalId] = trapFocus(el);
+}
+
+function disableFocusTrap(modalId) {
+  if (_focusTrapCleanup[modalId]) {
+    _focusTrapCleanup[modalId]();
+    delete _focusTrapCleanup[modalId];
+  }
+}
+
 // Pagination
 const BIKES_PAGE_SIZE = 24;
 let bikesOffset       = 0;
@@ -886,10 +927,12 @@ function openModal() {
   selectType(isDealer ? 'dealer' : 'private');
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  enableFocusTrap('modal');
 }
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
   document.body.style.overflow = '';
+  disableFocusTrap('modal');
 }
 document.getElementById('modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeModal();
@@ -962,10 +1005,12 @@ async function submitListing() {
 function openLoginModal() {
   document.getElementById('login-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  enableFocusTrap('login-modal');
 }
 function closeLoginModal() {
   document.getElementById('login-modal').classList.remove('open');
   document.body.style.overflow = '';
+  disableFocusTrap('login-modal');
 }
 document.getElementById('login-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeLoginModal();
@@ -1037,10 +1082,12 @@ function openProfileModal() {
   document.body.style.overflow = 'hidden';
   showProfileData();
   switchProfileTab('info');
+  enableFocusTrap('profile-modal');
 }
 function closeProfileModal() {
   document.getElementById('profile-modal').classList.remove('open');
   document.body.style.overflow = '';
+  disableFocusTrap('profile-modal');
 }
 document.getElementById('profile-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeProfileModal();
@@ -1918,7 +1965,7 @@ function editRemoveExisting(index) {
 function editPreviewImages(input) {
   const files = Array.from(input.files);
   const remaining = 8 - editExistingImgs.filter(img => !img.toDelete).length - editNewFiles.length;
-  files.slice(0, remaining).forEach((file, i) => {
+  files.filter(validateImageFile).slice(0, remaining).forEach((file, i) => {
     const hasPrimary = editExistingImgs.some(img => !img.toDelete && img.is_primary) || editNewFiles.some(f => f.isPrimary);
     editNewFiles.push({ file, url: URL.createObjectURL(file), isPrimary: !hasPrimary && i === 0 });
   });
@@ -2026,13 +2073,28 @@ async function saveEditedListing() {
 
 let selectedFiles = []; // { file, url, isPrimary }
 
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_IMAGE_SIZE_MB   = 10;
+
+function validateImageFile(file) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    showToast(`⚠️ "${file.name}" er ikke et gyldigt billedformat (kun JPG, PNG, WebP, GIF)`);
+    return false;
+  }
+  if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+    showToast(`⚠️ "${file.name}" er for stor (maks ${MAX_IMAGE_SIZE_MB} MB)`);
+    return false;
+  }
+  return true;
+}
+
 function previewImages(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
 
   // Maks 8 billeder i alt
   const remaining = 8 - selectedFiles.length;
-  const toAdd = files.slice(0, remaining);
+  const toAdd = files.filter(validateImageFile).slice(0, remaining);
 
   toAdd.forEach((file, i) => {
     const url = URL.createObjectURL(file);
@@ -2172,11 +2234,13 @@ function startRealtimeNotifications() {
 function openBecomeDealerModal() {
   document.getElementById('dealer-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  enableFocusTrap('dealer-modal');
 }
 
 function closeBecomeDealerModal() {
   document.getElementById('dealer-modal').classList.remove('open');
   document.body.style.overflow = '';
+  disableFocusTrap('dealer-modal');
 }
 
 async function submitDealerApplication() {
@@ -2290,11 +2354,13 @@ async function openInboxModal() {
   document.getElementById('inbox-modal-list').style.display = 'flex';
   document.getElementById('inbox-modal-thread').style.display = 'none';
   await loadInboxModal();
+  enableFocusTrap('inbox-modal');
 }
 
 function closeInboxModal() {
   document.getElementById('inbox-modal').classList.remove('open');
   document.body.style.overflow = '';
+  disableFocusTrap('inbox-modal');
 }
 
 async function loadInboxModal() {
@@ -3150,7 +3216,19 @@ var idDocFile = null;
 
 function previewIdDoc(input) {
   if (!input.files || !input.files[0]) return;
-  idDocFile = input.files[0];
+  const file = input.files[0];
+  const allowedIdTypes = [...ALLOWED_IMAGE_TYPES, 'application/pdf'];
+  if (!allowedIdTypes.includes(file.type)) {
+    showToast('⚠️ Kun billeder (JPG, PNG, WebP) og PDF er tilladt som ID-dokument');
+    input.value = '';
+    return;
+  }
+  if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+    showToast(`⚠️ Filen er for stor (maks ${MAX_IMAGE_SIZE_MB} MB)`);
+    input.value = '';
+    return;
+  }
+  idDocFile = file;
 
   var label = document.getElementById('id-upload-label');
   if (label) label.textContent = idDocFile.name;

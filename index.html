@@ -3,32 +3,82 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cykelbørsen – Køb & Sælg Brugte Cykler</title>
+  <title>Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark</title>
+  <meta name="description" content="Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce. Fra private sælgere og autoriserede forhandlere.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://xn--cykelbrsen-5cb.dk/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://xn--cykelbrsen-5cb.dk/">
+  <meta property="og:title" content="Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark">
+  <meta property="og:description" content="Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce.">
+  <meta property="og:locale" content="da_DK">
+  <meta property="og:site_name" content="Cykelbørsen">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark">
+  <meta name="twitter:description" content="Danmarks markedsplads for brugte cykler. Gratis at oprette annonce.">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Cykelbørsen",
+    "url": "https://xn--cykelbrsen-5cb.dk/",
+    "description": "Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere.",
+    "inLanguage": "da",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://xn--cykelbrsen-5cb.dk/?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Cykelbørsen",
+    "url": "https://xn--cykelbrsen-5cb.dk/",
+    "description": "Danmarks markedsplads for køb og salg af brugte cykler.",
+    "foundingLocation": {
+      "@type": "Place",
+      "addressCountry": "DK"
+    }
+  }
+  </script>
 </head>
 <body>
 
   <!-- ── NAVIGATION ── -->
-  <nav>
-    <div class="logo" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="cursor:pointer;">Cykel<span>børsen</span></div>
+  <nav role="navigation" aria-label="Hovednavigation">
+    <div class="logo" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="cursor:pointer;" role="link" aria-label="Cykelbørsen – gå til forsiden" tabindex="0">Cykel<span>børsen</span></div>
     <div class="nav-links">
-      <a onclick="showSection('listings')">Annoncer</a>
-      <a onclick="showSection('dealers')">Forhandlere</a>
-      <a>Om os</a>
-      <a class="btn-sell" onclick="openModal()">+ Sæt til salg</a>
+      <a onclick="showSection('listings')" role="button" aria-label="Se alle annoncer">Annoncer</a>
+      <a onclick="showSection('dealers')" role="button" aria-label="Se forhandlere">Forhandlere</a>
+      <a aria-label="Om Cykelbørsen">Om os</a>
+      <a class="btn-sell" onclick="openModal()" aria-label="Opret annonce og sæt din cykel til salg">+ Sæt til salg</a>
       <div class="nav-admin" id="nav-admin" style="display:none;">
-        <button class="nav-admin-btn" onclick="openAdminPanel()" title="Admin panel">⚙️</button>
+        <button class="nav-admin-btn" onclick="openAdminPanel()" aria-label="Åbn admin panel">⚙️</button>
       </div>
       <div class="nav-profile" id="nav-profile" style="display:none;">
-        <button class="nav-inbox-btn" id="nav-inbox-btn" onclick="openInboxModal()" title="Indbakke">
-          <span class="nav-inbox-icon">✉️</span>
-          <span class="nav-inbox-badge" id="nav-inbox-badge" style="display:none;">0</span>
+        <button class="nav-inbox-btn" id="nav-inbox-btn" onclick="openInboxModal()" aria-label="Åbn indbakke">
+          <span class="nav-inbox-icon" aria-hidden="true">✉️</span>
+          <span class="nav-inbox-badge" id="nav-inbox-badge" style="display:none;" aria-live="polite" aria-label="Ulæste beskeder">0</span>
         </button>
-        <button class="profile-avatar-btn" id="profile-avatar-btn" onclick="openProfileModal()">
-          <span id="nav-initials">?</span>
+        <button class="profile-avatar-btn" id="profile-avatar-btn" onclick="openProfileModal()" aria-label="Åbn din profil">
+          <span id="nav-initials" aria-hidden="true">?</span>
         </button>
       </div>
     </div>
@@ -63,13 +113,15 @@
   </section>
 
   <!-- ── SØGEBAR ── -->
-  <div class="search-section">
+  <div class="search-section" role="search" aria-label="Søg efter cykler">
     <div class="search-bar">
       <div style="position:relative;flex:1;">
-        <input type="text" id="search-input" placeholder="Søg efter mærke, model, type..." oninput="searchAutocomplete(this.value)" onkeydown="handleSearchKey(event)" autocomplete="off">
-        <div id="autocomplete-list" class="autocomplete-list" style="display:none;"></div>
+        <label for="search-input" class="sr-only">Søg efter mærke, model eller type</label>
+        <input type="text" id="search-input" placeholder="Søg efter mærke, model, type..." oninput="searchAutocomplete(this.value)" onkeydown="handleSearchKey(event)" autocomplete="off" aria-label="Søg efter cykler" aria-autocomplete="list" aria-controls="autocomplete-list">
+        <div id="autocomplete-list" class="autocomplete-list" style="display:none;" role="listbox" aria-label="Søgeforslag"></div>
       </div>
-      <select id="search-type">
+      <label for="search-type" class="sr-only">Vælg cykeltype</label>
+      <select id="search-type" aria-label="Filtrer efter cykeltype">
         <option value="">Alle typer</option>
         <option>Racercykel</option>
         <option>Mountainbike</option>
@@ -78,27 +130,28 @@
         <option>Ladcykel</option>
         <option>Børnecykel</option>
       </select>
-      <select id="search-city">
+      <label for="search-city" class="sr-only">Vælg by</label>
+      <select id="search-city" aria-label="Filtrer efter by">
         <option value="">Alle steder</option>
         <option>København</option>
         <option>Aarhus</option>
         <option>Odense</option>
         <option>Aalborg</option>
       </select>
-      <button onclick="searchBikes()">🔍 Søg</button>
+      <button onclick="searchBikes()" aria-label="Søg efter cykler">🔍 Søg</button>
     </div>
   </div>
 
   <!-- ── HURTIGFILTER PILLS ── -->
-  <div class="filters-row">
-    <span class="filters-label">Hurtigfilter:</span>
-    <span class="pill active" onclick="togglePill(this)">Alle</span>
-    <span class="pill" onclick="togglePill(this)">Under 3.000 kr</span>
-    <span class="pill" onclick="togglePill(this)">El-cykler</span>
-    <span class="pill" onclick="togglePill(this)">Kun forhandlere</span>
-    <span class="pill" onclick="togglePill(this)">Kun private</span>
-    <span class="pill" onclick="togglePill(this)">Ny annonce</span>
-    <span class="pill" onclick="togglePill(this)">Med garanti</span>
+  <div class="filters-row" role="group" aria-label="Hurtigfiltre">
+    <span class="filters-label" aria-hidden="true">Hurtigfilter:</span>
+    <span class="pill active" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="true">Alle</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">Under 3.000 kr</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">El-cykler</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">Kun forhandlere</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">Kun private</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">Ny annonce</span>
+    <span class="pill" onclick="togglePill(this)" role="button" tabindex="0" aria-pressed="false">Med garanti</span>
   </div>
 
   <!-- ── MAIN: SIDEBAR + ANNONCER ── -->
@@ -163,9 +216,10 @@
           <span id="listings-count">– cykler til salg</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="view-toggle" id="btn-list-view" onclick="setView('list')" title="Listevisning">☰</button>
-          <button class="view-toggle" id="btn-map-view" onclick="setView('map')" title="Kortvisning">🗺️</button>
-          <select class="sort-select" onchange="sortBikes(this.value)">
+          <button class="view-toggle" id="btn-list-view" onclick="setView('list')" aria-label="Skift til listevisning" aria-pressed="true">☰</button>
+          <button class="view-toggle" id="btn-map-view" onclick="setView('map')" aria-label="Skift til kortvisning" aria-pressed="false">🗺️</button>
+          <label for="sort-select" class="sr-only">Sorter annoncer</label>
+          <select class="sort-select" id="sort-select" onchange="sortBikes(this.value)" aria-label="Sorter annoncer">
             <option value="newest">Nyeste først</option>
             <option value="price_asc">Pris: lav til høj</option>
             <option value="price_desc">Pris: høj til lav</option>
