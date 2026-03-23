@@ -54,7 +54,7 @@ async function init() {
       .from('profiles').select('*').eq('id', currentUser.id).single();
     currentProfile = profile;
 
-    updateNav(true, profile?.name);
+    updateNav(true, profile?.name, profile?.avatar_url);
     startRealtimeNotifications();
     // Vis admin knap hvis admin
     if (profile && profile.is_admin) {
@@ -72,7 +72,7 @@ async function init() {
       const { data: profile } = await supabase
         .from('profiles').select('*').eq('id', currentUser.id).single();
       currentProfile = profile;
-      updateNav(true, profile?.name);
+      updateNav(true, profile?.name, profile?.avatar_url);
     } else {
       currentUser    = null;
       currentProfile = null;
@@ -111,14 +111,14 @@ async function init() {
   });
 }
 
-function updateNav(loggedIn, name) {
+function updateNav(loggedIn, name, avatarUrl) {
   const sellBtn    = document.querySelector('.btn-sell');
   const navProfile = document.getElementById('nav-profile');
 
   if (loggedIn) {
     if (sellBtn) { sellBtn.textContent = '+ Sæt til salg'; sellBtn.setAttribute('onclick', 'openModal()'); }
     if (navProfile) navProfile.style.display = 'flex';
-    updateNavAvatar(name);
+    updateNavAvatar(name, avatarUrl);
     checkUnreadMessages();
   } else {
     if (sellBtn) { sellBtn.textContent = 'Log ind / Sælg'; sellBtn.setAttribute('onclick', 'openLoginModal()'); }
@@ -126,9 +126,14 @@ function updateNav(loggedIn, name) {
   }
 }
 
-function updateNavAvatar(name) {
+function updateNavAvatar(name, avatarUrl) {
   const el = document.getElementById('nav-initials');
-  if (el) el.textContent = (name || '?').substring(0, 2).toUpperCase();
+  if (!el) return;
+  if (avatarUrl) {
+    el.innerHTML = `<img src="${avatarUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  } else {
+    el.textContent = (name || '?').substring(0, 2).toUpperCase();
+  }
 }
 
 async function checkUnreadMessages() {
@@ -287,7 +292,7 @@ async function openDealerProfile(dealerId) {
   // Hent forhandlerens profil
   const { data: dealer } = await supabase
     .from('profiles')
-    .select('id, shop_name, name, city, verified')
+    .select('id, shop_name, name, city, verified, avatar_url')
     .eq('id', dealerId)
     .single();
 
@@ -301,9 +306,13 @@ async function openDealerProfile(dealerId) {
   const countMap    = window._dealerCountMap || {};
   const bikeCount   = countMap[dealerId] ?? null;
 
+  const dealerLogoContent = dealer.avatar_url
+    ? `<img src="${dealer.avatar_url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    : initials;
+
   header.innerHTML = `
     <div class="dealer-profile-hero">
-      <div class="dealer-profile-logo">${initials}</div>
+      <div class="dealer-profile-logo">${dealerLogoContent}</div>
       <div class="dealer-profile-info">
         <h2 class="dealer-profile-name">
           ${displayName}
@@ -398,7 +407,7 @@ async function openUserProfile(userId) {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
     const [r1, r2, r3, r4] = await Promise.all([
-      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at').eq('id', userId).single()),
+      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url').eq('id', userId).single()),
       safe(supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
@@ -508,10 +517,14 @@ async function openUserProfile(userId) {
     <p class="up-empty" style="font-size:0.85rem;color:var(--muted);margin-top:8px;">Du kan kun vurdere brugere du har handlet med.</p>`
   : '';
 
+  const upAvatarContent = profile.avatar_url
+    ? `<img src="${profile.avatar_url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    : initials;
+
   content.innerHTML = `
     <!-- Header -->
     <div class="up-header">
-      <div class="up-avatar">${initials}</div>
+      <div class="up-avatar">${upAvatarContent}</div>
       <div class="up-meta">
         <h2 class="up-name">
           ${displayName}
@@ -1039,7 +1052,12 @@ function showProfileData() {
   const name    = profile.name || currentUser?.email?.split('@')[0] || 'Ukendt';
   const initials = name.substring(0, 2).toUpperCase();
 
-  document.getElementById('profile-big-avatar').textContent   = initials;
+  const avatarEl = document.getElementById('profile-big-avatar');
+  if (profile.avatar_url) {
+    avatarEl.innerHTML = `<img src="${profile.avatar_url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  } else {
+    avatarEl.textContent = initials;
+  }
   document.getElementById('profile-display-name').textContent  = name;
   document.getElementById('profile-display-email').textContent = currentUser?.email || '';
 
@@ -1116,9 +1134,37 @@ async function saveProfile() {
     // Opdater cache
     currentProfile = { ...currentProfile, ...updates };
     showProfileData();
-    updateNavAvatar(updates.name);
+    updateNavAvatar(updates.name, currentProfile.avatar_url);
     showToast('✅ Profil opdateret!');
   } finally { restore(); }
+}
+
+async function uploadAvatar(file) {
+  if (!file || !currentUser) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('❌ Billedet må maks være 5 MB'); return; }
+
+  const ext  = file.name.split('.').pop();
+  const path = `${currentUser.id}/avatar.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) { showToast('❌ Kunne ikke uploade billede'); console.error(uploadError); return; }
+
+  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+  // Tilføj cache-busting så browseren henter det nye billede
+  const avatarUrl = publicUrl + '?t=' + Date.now();
+
+  const { error: updateError } = await supabase
+    .from('profiles').update({ avatar_url: avatarUrl }).eq('id', currentUser.id);
+
+  if (updateError) { showToast('❌ Kunne ikke gemme profilbillede'); return; }
+
+  currentProfile = { ...currentProfile, avatar_url: avatarUrl };
+  showProfileData();
+  updateNavAvatar(currentProfile?.name, avatarUrl);
+  showToast('✅ Profilbillede opdateret!');
 }
 
 async function loadMyListings() {

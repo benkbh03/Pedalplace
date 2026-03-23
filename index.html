@@ -425,7 +425,11 @@
 
         <!-- Profil header -->
         <div class="profile-header">
-          <div class="profile-big-avatar" id="profile-big-avatar">?</div>
+          <div class="profile-avatar-wrap" onclick="document.getElementById('avatar-file-input').click()" title="Skift profilbillede">
+            <div class="profile-big-avatar" id="profile-big-avatar">?</div>
+            <div class="avatar-upload-overlay">📷</div>
+          </div>
+          <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="uploadAvatar(this.files[0])">
           <div>
             <div class="profile-name" id="profile-display-name">Indlæser...</div>
             <div class="profile-email" id="profile-display-email"></div>
