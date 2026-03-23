@@ -2856,7 +2856,10 @@ function geocodeCity(city) {
             _saveGeocodeCache();
             return coords;
           }
-          _geocodeCache[key] = null; // By ikke fundet — cache negativt svar
+          // Cache ikke null for adresse-opslag (kun by) så fallback kan virke
+          if (!key.match(/,/)) {
+            _geocodeCache[key] = null;
+          }
           return null;
         })
         .catch(function() { return null; });
@@ -2957,15 +2960,23 @@ async function initMap() {
   }
 
   // Geokod via Nominatim (med cache) og tilføj markører
-  // Brug præcis adresse hvis tilgængelig, ellers kun by
+  // Prøv præcis adresse først, fald tilbage til by hvis ikke fundet
   var geocodePromises = result.data
     .filter(function(b) { return !!b.city; })
     .map(function(b) {
       var profile = b.profiles || {};
-      var query = (profile.address && profile.address.trim())
+      var fullAddress = (profile.address && profile.address.trim())
         ? profile.address.trim() + ', ' + b.city
-        : b.city;
-      return geocodeCity(query).then(function(coords) {
+        : null;
+
+      var lookup = fullAddress
+        ? geocodeCity(fullAddress).then(function(coords) {
+            if (coords) return coords;
+            return geocodeCity(b.city); // Fallback til by
+          })
+        : geocodeCity(b.city);
+
+      return lookup.then(function(coords) {
         if (coords) addBikeMarker(b, coords);
       });
     });
