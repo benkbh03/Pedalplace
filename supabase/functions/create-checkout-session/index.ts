@@ -10,8 +10,7 @@
 //   - Månedlig plan: 199 DKK/måned (tilbagevendende)
 //   - Årlig plan:  1.499 DKK/år   (tilbagevendende)
 //
-// Aktivér MobilePay i Stripe Dashboard:
-//   Stripe Dashboard → Settings → Payment methods → MobilePay → Aktivér
+// Betalingsmetoder: kort (Visa, Mastercard) – MobilePay understøttes ikke i subscription mode
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -81,7 +80,7 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
-      payment_method_types: ["card", "mobilepay"],
+      payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${success_url}?dealer_success=true`,
       cancel_url:  `${cancel_url}?dealer_cancel=true`,
