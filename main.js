@@ -2929,7 +2929,7 @@ async function initMap() {
   // Hent annoncer med by
   var result = await supabase
     .from('bikes')
-    .select('*, profiles(name, seller_type, shop_name, verified)')
+    .select('*, profiles(name, seller_type, shop_name, verified, address)')
     .eq('is_active', true);
 
   if (!result.data || result.data.length === 0) return;
@@ -2973,11 +2973,16 @@ async function initMap() {
     mapMarkers.push(marker);
   }
 
-  // Geokod alle byer via Nominatim (med cache) og tilføj markører
+  // Geokod via Nominatim (med cache) og tilføj markører
+  // Brug præcis adresse hvis tilgængelig, ellers kun by
   var geocodePromises = result.data
     .filter(function(b) { return !!b.city; })
     .map(function(b) {
-      return geocodeCity(b.city).then(function(coords) {
+      var profile = b.profiles || {};
+      var query = (profile.address && profile.address.trim())
+        ? profile.address.trim() + ', ' + b.city
+        : b.city;
+      return geocodeCity(query).then(function(coords) {
         if (coords) addBikeMarker(b, coords);
       });
     });
