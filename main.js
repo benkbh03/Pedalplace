@@ -1303,11 +1303,15 @@ async function uploadAvatar(file) {
 
 async function loadMyListings() {
   if (!currentUser) return;
-
-  const { data, error } = await supabase
-    .from('bikes').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-
   const grid = document.getElementById('my-listings-grid');
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from('bikes').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }));
+  } catch (e) {
+    grid.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente annoncer. <button onclick="loadMyListings()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
   if (error || !data || data.length === 0) {
     grid.innerHTML = '<p style="color:var(--muted)">Du har ingen aktive annoncer.</p>';
     return;
@@ -1342,13 +1346,17 @@ async function deleteListing(id) {
 
 async function loadSavedListings() {
   if (!currentUser) return;
-
-  const { data, error } = await supabase
-    .from('saved_bikes')
-    .select('bike_id, bikes(brand, model, price, type, city, condition)')
-    .eq('user_id', currentUser.id);
-
   const grid = document.getElementById('my-saved-grid');
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from('saved_bikes')
+      .select('bike_id, bikes(brand, model, price, type, city, condition)')
+      .eq('user_id', currentUser.id));
+  } catch (e) {
+    grid.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente gemte annoncer. <button onclick="loadSavedListings()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
   if (error || !data || data.length === 0) {
     grid.innerHTML = '<p style="color:var(--muted)">Du har ikke gemt nogen annoncer endnu.</p>';
     return;
@@ -1712,21 +1720,24 @@ async function loadInbox() {
   const list = document.getElementById('inbox-list');
   list.innerHTML = '<p style="color:var(--muted)">Henter beskeder...</p>';
 
-  // Hent alle beskeder hvor brugeren er afsender eller modtager
-  const { data, error } = await supabase
-    .from('messages')
-    .select(`
-      *,
-      bikes(brand, model),
-      sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type),
-      receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)
-    `)
-    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-    .order('created_at', { ascending: false });
-
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from('messages')
+      .select(`
+        *,
+        bikes(brand, model),
+        sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type),
+        receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)
+      `)
+      .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+      .order('created_at', { ascending: false }));
+  } catch (e) {
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder. <button onclick="loadInbox()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
   if (error) {
-    console.error('Inbox fejl:', error);
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>';
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder. <button onclick="loadInbox()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
     return;
   }
 
@@ -2511,6 +2522,12 @@ window.loadInboxModal     = loadInboxModal;
 /* ============================================================
    START
    ============================================================ */
+
+// Fang uventede promise-fejl globalt så siden ikke sidder fast
+window.addEventListener('unhandledrejection', event => {
+  console.error('[Uhandteret fejl]', event.reason);
+  event.preventDefault();
+});
 
 init();
 
