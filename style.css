@@ -610,6 +610,9 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 #bike-modal,
 #map-bike-modal { z-index: 2500; }
 
+/* Login-modal skal ligge over cykel-modalen */
+#login-modal { z-index: 3000; }
+
 /* Del/share-modal skal ligge over cykel-modalen */
 #share-modal { z-index: 3000; }
 .modal {
