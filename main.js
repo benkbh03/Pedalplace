@@ -1916,6 +1916,40 @@ async function acceptBid(content) {
   updateFilterCounts();
 }
 
+async function acceptBidFromInbox(content) {
+  if (!activeInboxThread?.isSeller || !activeInboxThread?.bikeActive) return;
+
+  const match  = content.match(/💰 Bud: (.+) kr\./);
+  const amount = match ? match[1] + ' kr.' : 'buddet';
+
+  if (!confirm(`Vil du acceptere ${amount}?\nAnnoncen markeres som solgt og køber får besked.`)) return;
+
+  const { error: soldErr } = await supabase.from('bikes')
+    .update({ is_active: false })
+    .eq('id', activeInboxThread.bikeId)
+    .eq('user_id', currentUser.id);
+
+  if (soldErr) { showToast('❌ Kunne ikke markere som solgt'); return; }
+
+  const confirmContent = `✅ Bud på ${amount} accepteret! Kontakt hinanden for at aftale overdragelse.`;
+  const { data: inserted } = await supabase.from('messages').insert({
+    bike_id:     activeInboxThread.bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: activeInboxThread.otherId,
+    content:     confirmContent,
+  }).select('id').single();
+
+  if (inserted?.id) {
+    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
+  }
+
+  showToast('🎉 Bud accepteret! Annoncen er markeret som solgt.');
+  activeInboxThread.bikeActive = false;
+  openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
+  loadBikes();
+  updateFilterCounts();
+}
+
 function closeThread() {
   activeThread = null;
   document.getElementById('inbox-list').style.display     = 'flex';
@@ -2585,6 +2619,7 @@ window.openThread         = openThread;
 window.closeThread        = closeThread;
 window.sendReply          = sendReply;
 window.acceptBid          = acceptBid;
+window.acceptBidFromInbox = acceptBidFromInbox;
 window.openInboxModal     = openInboxModal;
 window.closeInboxModal    = closeInboxModal;
 window.openInboxThread    = openInboxThread;
@@ -2708,6 +2743,18 @@ async function openInboxThread(bikeId, otherId, otherName) {
   document.getElementById('inbox-modal-thread-header').innerHTML =
     '<strong>' + otherName + '</strong> — <span style="color:var(--muted)">besked om annonce</span>';
 
+  // Hent cykel-info for at tjekke om bruger er sælger og annoncen er aktiv
+  const { data: bikeData } = await supabase
+    .from('bikes')
+    .select('user_id, is_active')
+    .eq('id', bikeId)
+    .single();
+
+  const isSeller   = bikeData && bikeData.user_id === currentUser.id;
+  const bikeActive = bikeData && bikeData.is_active;
+  activeInboxThread.isSeller   = isSeller;
+  activeInboxThread.bikeActive = bikeActive;
+
   const { data, error } = await supabase
     .from('messages')
     .select('*')
@@ -2719,12 +2766,16 @@ async function openInboxThread(bikeId, otherId, otherName) {
   if (error || !data) { threadEl.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>'; return; }
 
   threadEl.innerHTML = data.map(function(msg) {
-    const isSent = msg.sender_id === currentUser.id;
-    const time   = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-    const isBid  = msg.content.indexOf('💰') === 0;
-    return '<div class="message-bubble ' + (isSent ? 'sent' : 'received') + '" ' + (isBid ? 'style="border:2px solid var(--rust-light)"' : '') + '>'
+    const isSent     = msg.sender_id === currentUser.id;
+    const time       = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const isBid      = msg.content.indexOf('💰') === 0;
+    const isAccepted = msg.content.startsWith('✅ Bud på');
+    const showAccept = isBid && !isSent && isSeller && bikeActive;
+    const safeContent = msg.content.replace(/'/g, "\\'");
+    return '<div class="message-bubble ' + (isSent ? 'sent' : 'received') + (isBid ? ' bid-bubble' : '') + (isAccepted ? ' accepted-bubble' : '') + '">'
       + msg.content
       + '<div class="msg-time">' + time + '</div>'
+      + (showAccept ? '<button class="btn-accept-bid" onclick="acceptBidFromInbox(\'' + safeContent + '\')">✅ Accepter bud</button>' : '')
       + '</div>';
   }).join('');
 
