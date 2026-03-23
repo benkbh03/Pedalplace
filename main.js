@@ -1820,18 +1820,31 @@ async function openThread(bikeId, otherId, otherName) {
 
   document.getElementById('inbox-list').style.display     = 'none';
   document.getElementById('message-thread').style.display = 'block';
+  document.getElementById('thread-header').innerHTML      =
+    `<strong>${otherName}</strong> — <span style="color:var(--muted)">Henter...</span>`;
 
-  // Sæt tråd-header
+  // Hent beskeder og cykel-info parallelt
+  const [{ data, error }, { data: bike }] = await Promise.all([
+    supabase.from('messages')
+      .select('*')
+      .eq('bike_id', bikeId)
+      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${currentUser.id})`)
+      .order('created_at', { ascending: true }),
+    supabase.from('bikes')
+      .select('user_id, is_active, brand, model')
+      .eq('id', bikeId)
+      .single()
+  ]);
+
+  const isSeller   = bike?.user_id === currentUser.id;
+  const bikeActive = bike?.is_active === true;
+  const bikeName   = bike ? `${bike.brand} ${bike.model}` : 'annonce';
+
+  activeThread.isSeller   = isSeller;
+  activeThread.bikeActive = bikeActive;
+
   document.getElementById('thread-header').innerHTML =
-    `<strong>${otherName}</strong> — <span style="color:var(--muted)">besked om annonce</span>`;
-
-  // Hent alle beskeder i denne tråd
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('bike_id', bikeId)
-    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${currentUser.id})`)
-    .order('created_at', { ascending: true });
+    `<strong>${otherName}</strong> — <span style="color:var(--muted)">${bikeName}</span>`;
 
   const threadEl = document.getElementById('thread-messages');
   if (error || !data) {
@@ -1840,24 +1853,67 @@ async function openThread(bikeId, otherId, otherName) {
   }
 
   threadEl.innerHTML = data.map(msg => {
-    const isSent = msg.sender_id === currentUser.id;
-    const time   = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const isSent    = msg.sender_id === currentUser.id;
+    const isBid     = msg.content.startsWith('💰 Bud:');
+    const isAccepted = msg.content.startsWith('✅ Bud på');
+    const time      = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+
+    // Vis "Accepter bud" knap kun for sælger på modtagne bud, mens annoncen er aktiv
+    const acceptBtn = (isBid && !isSent && isSeller && bikeActive)
+      ? `<button class="btn-accept-bid" onclick="acceptBid('${msg.content.replace(/'/g, "\\'")}')">✅ Accepter bud</button>`
+      : '';
+
     return `
-      <div class="message-bubble ${isSent ? 'sent' : 'received'}">
+      <div class="message-bubble ${isSent ? 'sent' : 'received'}${isBid ? ' bid-bubble' : ''}${isAccepted ? ' accepted-bubble' : ''}">
         ${msg.content}
+        ${acceptBtn}
         <div class="msg-time">${time}</div>
       </div>`;
   }).join('');
 
-  // Scroll til bunden
   threadEl.scrollTop = threadEl.scrollHeight;
 
-  // Marker ulæste som læst
   await supabase.from('messages')
     .update({ read: true })
     .eq('bike_id', bikeId)
     .eq('sender_id', otherId)
     .eq('receiver_id', currentUser.id);
+}
+
+async function acceptBid(content) {
+  if (!activeThread?.isSeller || !activeThread?.bikeActive) return;
+
+  const match  = content.match(/💰 Bud: (.+) kr\./);
+  const amount = match ? match[1] + ' kr.' : 'buddet';
+
+  if (!confirm(`Vil du acceptere ${amount}?\nAnnoncen markeres som solgt og køber får besked.`)) return;
+
+  // Marker cykel som solgt
+  const { error: soldErr } = await supabase.from('bikes')
+    .update({ is_active: false })
+    .eq('id', activeThread.bikeId)
+    .eq('user_id', currentUser.id);
+
+  if (soldErr) { showToast('❌ Kunne ikke markere som solgt'); return; }
+
+  // Send bekræftelsesbesked til køber
+  const confirmContent = `✅ Bud på ${amount} accepteret! Kontakt hinanden for at aftale overdragelse.`;
+  const { data: inserted } = await supabase.from('messages').insert({
+    bike_id:     activeThread.bikeId,
+    sender_id:   currentUser.id,
+    receiver_id: activeThread.otherId,
+    content:     confirmContent,
+  }).select('id').single();
+
+  if (inserted?.id) {
+    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
+  }
+
+  showToast('🎉 Bud accepteret! Annoncen er markeret som solgt.');
+  activeThread.bikeActive = false;
+  openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
+  loadBikes();
+  updateFilterCounts();
 }
 
 function closeThread() {
@@ -2528,6 +2584,7 @@ window.loadInbox          = loadInbox;
 window.openThread         = openThread;
 window.closeThread        = closeThread;
 window.sendReply          = sendReply;
+window.acceptBid          = acceptBid;
 window.openInboxModal     = openInboxModal;
 window.closeInboxModal    = closeInboxModal;
 window.openInboxThread    = openInboxThread;

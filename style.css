@@ -988,6 +988,10 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .message-bubble.sent { background: var(--forest); color: var(--sand); align-self: flex-end; border-bottom-right-radius: 4px; }
 .message-bubble.received { background: var(--sand); color: var(--charcoal); align-self: flex-start; border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .message-bubble .msg-time { font-size: 0.7rem; opacity: 0.6; margin-top: 4px; }
+.message-bubble.bid-bubble.received { background: #fff8ec; border-color: var(--rust); font-weight: 600; }
+.message-bubble.accepted-bubble { background: #edf7ed; border-color: #4caf50; color: #2e7d32; font-weight: 600; align-self: stretch; border-radius: 10px; border: 1.5px solid #4caf50; }
+.btn-accept-bid { display: block; width: 100%; margin-top: 10px; padding: 9px 0; background: var(--forest); color: #fff; border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s; }
+.btn-accept-bid:hover { background: var(--rust); }
 .thread-reply { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 14px; }
 .thread-reply textarea { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; resize: none; height: 80px; outline: none; background: var(--cream); transition: border-color 0.2s; }
 .thread-reply textarea:focus { border-color: var(--forest); }
