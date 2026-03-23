@@ -7,7 +7,16 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://ktufgncydxhkhfttojkh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_bxJ_gRDrsJ-XCWWUD6NiQA_1nlPDA2B';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: {
+    fetch: (url, options = {}) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timer));
+    }
+  }
+});
 
 // Global bruger-cache — hentes én gang ved init
 let currentUser    = null;
@@ -338,6 +347,12 @@ function openAllDealersModal() {
 function closeAllDealersModal() {
   const modal = document.getElementById('all-dealers-modal');
   if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function closeMapBikeModal() {
+  const el = document.getElementById('map-bike-modal');
+  if (el) el.classList.remove('open');
   document.body.style.overflow = '';
 }
 
@@ -1394,14 +1409,23 @@ async function openBikeModal(bikeId) {
   document.body.style.overflow = 'hidden';
   document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
 
-  const { data: b, error } = await supabase
-    .from('bikes')
-    .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
-    .eq('id', bikeId)
-    .single();
+  let b, error;
+  try {
+    ({ data: b, error } = await supabase
+      .from('bikes')
+      .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
+      .eq('id', bikeId)
+      .single());
+  } catch (e) {
+    error = e;
+  }
 
   if (error || !b) {
-    document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--rust)">Kunne ikke hente annonce.</p>';
+    document.getElementById('bike-modal-body').innerHTML = `
+      <div style="text-align:center;padding:40px 20px;">
+        <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce – tjek din internetforbindelse.</p>
+        <button onclick="openBikeModal('${bikeId}')" style="background:var(--rust);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:0.9rem;">Prøv igen</button>
+      </div>`;
     return;
   }
 
@@ -2482,6 +2506,7 @@ window.closeInboxModal    = closeInboxModal;
 window.openInboxThread    = openInboxThread;
 window.closeInboxThread   = closeInboxThread;
 window.sendInboxReply     = sendInboxReply;
+window.loadInboxModal     = loadInboxModal;
 
 /* ============================================================
    START
@@ -2515,13 +2540,27 @@ async function loadInboxModal() {
   const list = document.getElementById('inbox-modal-list');
   list.innerHTML = '<p style="color:var(--muted)">Henter beskeder...</p>';
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*, bikes(brand, model), sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type), receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)')
-    .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
-    .order('created_at', { ascending: false });
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from('messages')
+      .select('*, bikes(brand, model), sender:profiles!messages_sender_id_fkey(id, name, shop_name, seller_type), receiver:profiles!messages_receiver_id_fkey(id, name, shop_name, seller_type)')
+      .or('sender_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+      .order('created_at', { ascending: false }));
+  } catch (e) {
+    error = e;
+  }
 
-  if (error || !data || data.length === 0) {
+  if (error) {
+    list.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;">
+        <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente beskeder – tjek din internetforbindelse.</p>
+        <button onclick="loadInboxModal()" style="background:var(--rust);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:0.9rem;">Prøv igen</button>
+      </div>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
     list.innerHTML = '<p style="color:var(--muted)">Du har ingen beskeder endnu.</p>';
     return;
   }
