@@ -2845,23 +2845,26 @@ function _saveGeocodeCache() {
 // Slå præcis dansk adresse op via DAWA (Danmarks Adressers Web API)
 function geocodeAddress(address, city) {
   var query = address.trim() + ', ' + city.trim();
-  var key = 'dawa2:' + query.toLowerCase();
+  var key = 'dawa3:' + query.toLowerCase();
   if (_geocodeCache[key] !== undefined) return Promise.resolve(_geocodeCache[key]);
 
-  var url = 'https://api.dataforsyningen.dk/adresser?q='
-    + encodeURIComponent(query) + '&per_side=1&format=json';
+  var datavaskUrl = 'https://api.dataforsyningen.dk/datavask/adresser?betegnelse='
+    + encodeURIComponent(query);
 
-  return fetch(url)
+  return fetch(datavaskUrl)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data && data.length > 0) {
-        var koord = data[0].adgangsadresse.adgangspunkt.koordinater; // [lng, lat]
-        var coords = [koord[1], koord[0]];
-        _geocodeCache[key] = coords;
-        _saveGeocodeCache();
-        return coords;
-      }
-      return null; // Ikke cachet — by-fallback prøves
+      if (!data || !data.resultater || data.resultater.length === 0) return null;
+      var id = data.resultater[0].adresse.id;
+      return fetch('https://api.dataforsyningen.dk/adresser/' + id)
+        .then(function(r) { return r.json(); })
+        .then(function(adresse) {
+          var koord = adresse.adgangsadresse.adgangspunkt.koordinater; // [lng, lat]
+          var coords = [koord[1], koord[0]];
+          _geocodeCache[key] = coords;
+          _saveGeocodeCache();
+          return coords;
+        });
     })
     .catch(function() { return null; });
 }
