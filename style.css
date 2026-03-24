@@ -906,7 +906,9 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .profile-tab.active { color: var(--forest); border-bottom-color: var(--forest); }
 .btn-logout { background: transparent; color: var(--rust); border: 1.5px solid var(--rust); padding: 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; font-family: 'DM Sans', sans-serif; transition: background 0.2s, color 0.2s; }
 .btn-logout:hover { background: var(--rust); color: #fff; }
-.btn-delete-account { background: transparent; color: #999; border: 1.5px solid #ddd; padding: 10px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer; width: 100%; margin-top: 6px; font-family: 'DM Sans', sans-serif; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.danger-zone { margin-top: 28px; padding-top: 20px; border-top: 1.5px dashed #ddd; }
+.danger-zone-label { font-size: 0.72rem; font-weight: 700; color: #bbb; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.btn-delete-account { background: transparent; color: #bbb; border: 1.5px solid #e8e8e8; padding: 10px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer; width: 100%; font-family: 'DM Sans', sans-serif; transition: background 0.2s, color 0.2s, border-color 0.2s; }
 .btn-delete-account:hover { background: #fee; color: #c0392b; border-color: #c0392b; }
 .btn-delete-account:disabled { opacity: 0.6; cursor: not-allowed; }
 
