@@ -11,7 +11,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   global: {
     fetch: (url, options = {}) => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
+      const timer = setTimeout(() => controller.abort(), 25000);
       return fetch(url, { ...options, signal: controller.signal })
         .finally(() => clearTimeout(timer));
     }
@@ -3069,14 +3069,20 @@ async function loadDealerApplications() {
   var list = document.getElementById('admin-applications-list');
   list.innerHTML = '<p style="color:var(--muted)">Henter ansøgninger...</p>';
 
-  var result = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('seller_type', 'dealer')
-    .eq('verified', false)
-    .order('created_at', { ascending: false });
+  var result;
+  try {
+    result = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('seller_type', 'dealer')
+      .eq('verified', false)
+      .order('created_at', { ascending: false });
+  } catch (e) {
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente ansøgninger. <button onclick="loadDealerApplications()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
 
-  if (!result.data || result.data.length === 0) {
+  if (result.error || !result.data || result.data.length === 0) {
     list.innerHTML = '<p style="color:var(--muted)">Ingen ventende ansøgninger.</p>';
     return;
   }
@@ -3101,12 +3107,18 @@ async function loadAllUsers() {
   var list = document.getElementById('admin-users-list');
   list.innerHTML = '<p style="color:var(--muted)">Henter brugere...</p>';
 
-  var result = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
+  var result;
+  try {
+    result = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+  } catch (e) {
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente brugere. <button onclick="loadAllUsers()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
 
-  if (!result.data || result.data.length === 0) {
+  if (result.error || !result.data || result.data.length === 0) {
     list.innerHTML = '<p style="color:var(--muted)">Ingen brugere fundet.</p>';
     return;
   }
@@ -3728,13 +3740,19 @@ async function loadIdApplications() {
   var list = document.getElementById('admin-id-list');
   list.innerHTML = '<p style="color:var(--muted)">Henter ansøgninger...</p>';
 
-  var result = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id_pending', true)
-    .eq('id_verified', false);
+  var result;
+  try {
+    result = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id_pending', true)
+      .eq('id_verified', false);
+  } catch (e) {
+    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente ID-ansøgninger. <button onclick="loadIdApplications()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    return;
+  }
 
-  if (!result.data || result.data.length === 0) {
+  if (result.error || !result.data || result.data.length === 0) {
     list.innerHTML = '<p style="color:var(--muted)">Ingen ventende ID-ansøgninger.</p>';
     return;
   }
