@@ -716,6 +716,9 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 
 /* Del/share-modal skal ligge over cykel-modalen */
 #share-modal { z-index: 3000; }
+
+/* Rapport-modal skal ligge over cykel-modalen */
+#report-modal { z-index: 3000; }
 .modal {
   background: var(--cream); border-radius: 16px;
   max-width: 600px; width: 100%;
