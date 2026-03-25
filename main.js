@@ -211,18 +211,14 @@ async function init() {
 function updateNav(loggedIn, name, avatarUrl) {
   const sellBtn        = document.querySelector('.btn-sell');
   const navProfile     = document.getElementById('nav-profile');
-  const becomeDealerBtn = document.getElementById('nav-become-dealer');
-
   if (loggedIn) {
     if (sellBtn) { sellBtn.textContent = '+ Sæt til salg'; sellBtn.setAttribute('onclick', 'openModal()'); }
     if (navProfile) navProfile.style.display = 'flex';
-    if (becomeDealerBtn) becomeDealerBtn.style.display = currentProfile?.seller_type === 'dealer' ? 'none' : '';
     updateNavAvatar(name, avatarUrl);
     checkUnreadMessages();
   } else {
     if (sellBtn) { sellBtn.textContent = 'Log ind / Sælg'; sellBtn.setAttribute('onclick', 'openLoginModal()'); }
     if (navProfile) navProfile.style.display = 'none';
-    if (becomeDealerBtn) becomeDealerBtn.style.display = '';
   }
 }
 
