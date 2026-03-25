@@ -1464,15 +1464,7 @@ async function logout() {
   } catch (e) {
     console.warn('signOut fejl (ignoreret):', e);
   }
-  currentUser    = null;
-  currentProfile = null;
-  closeProfileModal();
-  var adminBtn = document.getElementById('nav-admin');
-  if (adminBtn) adminBtn.style.display = 'none';
-  updateNav(false);
-  dismissEmailBanner();
-  loadBikes();
-  showToast('👋 Du er logget ud');
+  window.location.reload();
 }
 
 function deleteAccount() {
