@@ -110,6 +110,7 @@ async function init() {
       var adminBtn = document.getElementById('nav-admin');
       if (adminBtn) adminBtn.style.display = 'flex';
     }
+    checkEmailConfirmed();
   } else {
     updateNav(false);
   }
@@ -211,6 +212,31 @@ function updateNav(loggedIn, name, avatarUrl) {
   } else {
     if (sellBtn) { sellBtn.textContent = 'Log ind / Sælg'; sellBtn.setAttribute('onclick', 'openLoginModal()'); }
     if (navProfile) navProfile.style.display = 'none';
+  }
+}
+
+function checkEmailConfirmed() {
+  var banner = document.getElementById('email-confirm-banner');
+  if (!banner || !currentUser) return;
+  if (currentUser.email_confirmed_at) {
+    banner.style.display = 'none';
+  } else {
+    banner.style.display = 'block';
+  }
+}
+
+function dismissEmailBanner() {
+  var banner = document.getElementById('email-confirm-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+async function resendConfirmationEmail() {
+  if (!currentUser?.email) return;
+  var { error } = await supabase.auth.resend({ type: 'signup', email: currentUser.email });
+  if (error) {
+    showToast('Kunne ikke sende bekræftelsesmail – prøv igen senere');
+  } else {
+    showToast('Bekræftelsesmail sendt! Tjek din indbakke');
   }
 }
 
@@ -1420,6 +1446,7 @@ async function logout() {
   var adminBtn = document.getElementById('nav-admin');
   if (adminBtn) adminBtn.style.display = 'none';
   updateNav(false);
+  dismissEmailBanner();
   showToast('👋 Du er logget ud');
 }
 
@@ -2715,7 +2742,9 @@ window.deleteListing     = deleteListing;
 window.togglePill        = togglePill;
 window.toggleSave        = toggleSave;
 window.showSection       = showSection;
-window.logout            = logout;
+window.logout                  = logout;
+window.resendConfirmationEmail = resendConfirmationEmail;
+window.dismissEmailBanner      = dismissEmailBanner;
 window.deleteAccount          = deleteAccount;
 window.closeDeleteAccountModal = closeDeleteAccountModal;
 window.onDeleteConfirmInput   = onDeleteConfirmInput;
