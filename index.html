@@ -69,6 +69,7 @@
       <a onclick="showSection('listings')" role="button" aria-label="Se alle annoncer">Annoncer</a>
       <a onclick="showSection('dealers')" role="button" aria-label="Se forhandlere">Forhandlere</a>
       <a onclick="openFooterModal('about')" role="button" aria-label="Om Cykelbørsen">Om os</a>
+      <a id="nav-become-dealer" onclick="openBecomeDealerModal()" role="button" aria-label="Bliv forhandler på Cykelbørsen">Bliv forhandler</a>
       <a class="btn-sell" onclick="openModal()" aria-label="Opret annonce og sæt din cykel til salg">+ Sæt til salg</a>
       <div class="nav-admin" id="nav-admin" style="display:none;">
         <button class="nav-admin-btn" onclick="openAdminPanel()" aria-label="Åbn admin panel">⚙️</button>
@@ -539,9 +540,10 @@
             <div class="form-group"><label>Navn</label><input type="text" id="edit-name" placeholder="Dit navn"></div>
             <div class="form-group"><label>Telefon</label><input type="text" id="edit-phone" placeholder="f.eks. 12 34 56 78"></div>
             <div class="form-group"><label>By</label><input type="text" id="edit-city" placeholder="f.eks. København"></div>
-            <div class="form-group">
+            <div class="form-group" id="edit-seller-type-group">
               <label>Sælgertype</label>
-              <select id="edit-seller-type" onchange="onSellerTypeChange(this)">
+              <p id="edit-seller-type-display" style="margin:0;padding:10px 14px;background:var(--sand);border:1px solid var(--border);border-radius:10px;font-size:0.9rem;color:var(--charcoal);"></p>
+              <select id="edit-seller-type" style="display:none;">
                 <option value="private">👤 Privatperson</option>
                 <option value="dealer">🏪 Forhandler</option>
               </select>
