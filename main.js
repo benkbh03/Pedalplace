@@ -1337,7 +1337,7 @@ async function loadMyListings() {
     ({ data, error } = await supabase
       .from('bikes').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }));
   } catch (e) {
-    grid.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente annoncer. <button onclick="loadMyListings()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    grid.innerHTML = retryHTML('Kunne ikke hente annoncer.', 'loadMyListings');
     return;
   }
   if (error || !data || data.length === 0) {
@@ -1382,7 +1382,7 @@ async function loadSavedListings() {
       .select('bike_id, bikes(brand, model, price, type, city, condition)')
       .eq('user_id', currentUser.id));
   } catch (e) {
-    grid.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente gemte annoncer. <button onclick="loadSavedListings()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    grid.innerHTML = retryHTML('Kunne ikke hente gemte annoncer.', 'loadSavedListings');
     return;
   }
   if (error || !data || data.length === 0) {
@@ -1481,6 +1481,10 @@ async function confirmDeleteAccount() {
 /* ============================================================
    TOAST & NAVIGATION SCROLL
    ============================================================ */
+
+function retryHTML(msg, fn) {
+  return `<p style="color:var(--rust)">${msg} <button onclick="${fn}()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>`;
+}
 
 function showToast(message) {
   const toast = document.getElementById('toast');
@@ -1874,11 +1878,11 @@ async function loadInbox() {
       .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
       .order('created_at', { ascending: false }));
   } catch (e) {
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder. <button onclick="loadInbox()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    list.innerHTML = retryHTML('Kunne ikke hente beskeder.', 'loadInbox');
     return;
   }
   if (error) {
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder. <button onclick="loadInbox()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    list.innerHTML = retryHTML('Kunne ikke hente beskeder.', 'loadInbox');
     return;
   }
 
@@ -2585,7 +2589,7 @@ function startRealtimeNotifications() {
       }
     });
 
-  channel.subscribe(function(_status) {});
+  channel.subscribe();
 }
 
 
@@ -3166,7 +3170,7 @@ async function loadDealerApplications() {
       .eq('verified', false)
       .order('created_at', { ascending: false });
   } catch (e) {
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente ansøgninger. <button onclick="loadDealerApplications()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    list.innerHTML = retryHTML('Kunne ikke hente ansøgninger.', 'loadDealerApplications');
     return;
   }
 
@@ -3202,7 +3206,7 @@ async function loadAllUsers() {
       .select('*')
       .order('created_at', { ascending: false });
   } catch (e) {
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente brugere. <button onclick="loadAllUsers()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    list.innerHTML = retryHTML('Kunne ikke hente brugere.', 'loadAllUsers');
     return;
   }
 
@@ -3836,7 +3840,7 @@ async function loadIdApplications() {
       .eq('id_pending', true)
       .eq('id_verified', false);
   } catch (e) {
-    list.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente ID-ansøgninger. <button onclick="loadIdApplications()" style="background:none;border:none;color:var(--rust);text-decoration:underline;cursor:pointer;">Prøv igen</button></p>';
+    list.innerHTML = retryHTML('Kunne ikke hente ID-ansøgninger.', 'loadIdApplications');
     return;
   }
 
@@ -3867,7 +3871,6 @@ async function approveId(userId) {
   if (err) { showToast('❌ Fejl'); return; }
   showToast('✅ ID godkendt — bruger har nu et blåt badge');
   loadIdApplications();
-  // Send email til brugeren
   supabase.functions.invoke('notify-message', {
     body: { type: 'id_approved', user_id: userId },
   }).catch(() => {});
@@ -3888,7 +3891,6 @@ async function rejectId(userId) {
   if (err) { showToast('❌ Fejl'); return; }
   showToast('ID-ansøgning afvist');
   loadIdApplications();
-  // Send email til brugeren
   supabase.functions.invoke('notify-message', {
     body: { type: 'id_rejected', user_id: userId },
   }).catch(() => {});
