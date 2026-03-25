@@ -811,13 +811,18 @@ async function loadBikes(filters = {}, append = false) {
   if (filters.warranty)   query = query.not('warranty', 'is', null);
   if (filters.newOnly)    query = query.gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-  const { data, error } = await query;
+  const { data: rawData, error } = await query;
 
   if (error) {
     console.error('loadBikes fejl:', error);
     if (!append) grid.innerHTML = '<p style="color:var(--rust);padding:20px">Kunne ikke hente annoncer.</p>';
     return;
   }
+
+  // sellerType filtreres client-side da det er en join-kolonne
+  const data = filters.sellerType
+    ? rawData.filter(b => b.profiles?.seller_type === filters.sellerType)
+    : rawData;
 
   if (append) {
     renderBikes(data, true);
