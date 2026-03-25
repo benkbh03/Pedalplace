@@ -1466,16 +1466,15 @@ async function loadSavedListings() {
    ============================================================ */
 
 async function logout() {
-  try {
-    await supabase.auth.signOut();
-  } catch (e) {
-    console.warn('signOut fejl (ignoreret):', e);
-  }
-  // Ryd Supabase session fra localStorage så den ikke genindlæses ved reload
-  Object.keys(localStorage)
-    .filter(k => k.startsWith('sb-'))
-    .forEach(k => localStorage.removeItem(k));
-  window.location.reload();
+  // Forsøg signOut men vent max 3 sekunder
+  await Promise.race([
+    supabase.auth.signOut().catch(() => {}),
+    new Promise(resolve => setTimeout(resolve, 3000)),
+  ]);
+  // Ryd al Supabase session-data uanset hvad
+  Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+  Object.keys(sessionStorage).filter(k => k.startsWith('sb-')).forEach(k => sessionStorage.removeItem(k));
+  window.location.href = window.location.pathname;
 }
 
 function deleteAccount() {
