@@ -143,6 +143,14 @@ async function init() {
     openBikeModal(sharedBikeId);
   }
 
+  // Håndter email-bekræftelse (Supabase sætter type=signup i hash)
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  if (hashParams.get('type') === 'signup') {
+    history.replaceState(null, '', window.location.pathname);
+    dismissEmailBanner();
+    showToast('✅ Din e-mail er bekræftet – velkommen til Cykelbørsen!');
+  }
+
   // Håndter returnering fra Stripe Checkout
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('dealer_success') === 'true') {
