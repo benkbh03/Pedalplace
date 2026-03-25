@@ -1223,6 +1223,15 @@ document.getElementById('profile-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeProfileModal();
 });
 
+function onSellerTypeChange(select) {
+  if (select.value === 'dealer' && currentProfile?.seller_type !== 'dealer') {
+    // Nulstil dropdown — forhandleransøgning sker via det officielle flow
+    select.value = currentProfile?.seller_type || 'private';
+    closeProfileModal();
+    openBecomeDealerModal();
+  }
+}
+
 function showProfileData() {
   // Brug den cachede profil — ingen ekstra netværkskald
   const profile = currentProfile || {};
@@ -1304,7 +1313,7 @@ async function saveProfile() {
     name:        document.getElementById('edit-name').value,
     phone:       document.getElementById('edit-phone').value,
     city:        document.getElementById('edit-city').value,
-    seller_type: document.getElementById('edit-seller-type').value,
+    seller_type: currentProfile?.seller_type || 'private', // sælgertype ændres kun via forhandler-flow
     shop_name:   document.getElementById('edit-shop-name').value,
     address:     document.getElementById('edit-address').value,
   };
@@ -2744,7 +2753,8 @@ window.handleForgotPassword = handleForgotPassword;
 window.openProfileModal  = openProfileModal;
 window.closeProfileModal = closeProfileModal;
 window.switchProfileTab  = switchProfileTab;
-window.saveProfile       = saveProfile;
+window.saveProfile          = saveProfile;
+window.onSellerTypeChange   = onSellerTypeChange;
 window.uploadAvatar      = uploadAvatar;
 window.deleteListing     = deleteListing;
 window.togglePill        = togglePill;

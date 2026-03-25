@@ -541,7 +541,7 @@
             <div class="form-group"><label>By</label><input type="text" id="edit-city" placeholder="f.eks. København"></div>
             <div class="form-group">
               <label>Sælgertype</label>
-              <select id="edit-seller-type">
+              <select id="edit-seller-type" onchange="onSellerTypeChange(this)">
                 <option value="private">👤 Privatperson</option>
                 <option value="dealer">🏪 Forhandler</option>
               </select>
