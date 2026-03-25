@@ -806,6 +806,7 @@ async function loadBikes(filters = {}, append = false) {
     .range(bikesOffset, bikesOffset + BIKES_PAGE_SIZE - 1);
 
   if (filters.type)       query = query.eq('type', filters.type);
+  if (filters.city)       query = query.ilike('city', `%${filters.city}%`);
   if (filters.maxPrice)   query = query.lte('price', filters.maxPrice);
   if (filters.search)     query = query.or(`brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%`);
   if (filters.warranty)   query = query.not('warranty', 'is', null);
@@ -920,7 +921,8 @@ function renderBikes(bikes, append = false) {
 function searchBikes() {
   const search = document.getElementById('search-input').value;
   const type   = document.getElementById('search-type').value;
-  loadBikes({ search, type });
+  const city   = document.getElementById('search-city').value;
+  loadBikes({ search, type, city });
 }
 
 function sortBikes(value) {
