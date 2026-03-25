@@ -143,12 +143,16 @@ async function init() {
     openBikeModal(sharedBikeId);
   }
 
-  // Håndter email-bekræftelse (Supabase sætter type=signup i hash)
+  // Håndter email-bekræftelse og password reset (Supabase sætter type i hash)
   const hashParams = new URLSearchParams(window.location.hash.slice(1));
   if (hashParams.get('type') === 'signup') {
     history.replaceState(null, '', window.location.pathname);
     dismissEmailBanner();
     showToast('✅ Din e-mail er bekræftet – velkommen til Cykelbørsen!');
+  } else if (hashParams.get('type') === 'recovery') {
+    history.replaceState(null, '', window.location.pathname);
+    document.getElementById('reset-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
   }
 
   // Håndter returnering fra Stripe Checkout
@@ -1157,7 +1161,7 @@ async function handleForgotPassword() {
   if (!email) { showToast('⚠️ Indtast din email'); return; }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://cykelbørsen.dk/',
+    redirectTo: 'https://xn--cykelbrsen-5cb.dk/',
   });
 
   if (error) {
