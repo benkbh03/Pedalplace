@@ -548,6 +548,20 @@ function closeDealerProfileModal() {
    BRUGER PROFIL
    ============================================================ */
 
+async function openUserProfileWithReview(userId) {
+  await openUserProfile(userId);
+  // Vent på at profil-indhold renderes, scroll så til og fremhæv vurderingsformularen
+  setTimeout(() => {
+    const wrap = document.getElementById('write-review-wrap');
+    if (wrap) {
+      wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      wrap.style.outline = '2.5px solid var(--rust)';
+      wrap.style.borderRadius = '12px';
+      setTimeout(() => { wrap.style.outline = ''; }, 2000);
+    }
+  }, 600);
+}
+
 async function openUserProfile(userId) {
   closeAllModals();
   const modal   = document.getElementById('user-profile-modal');
@@ -2111,11 +2125,11 @@ async function acceptBid(content) {
     supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
   }
 
-  showToast('🎉 Bud accepteret! Annoncen er markeret som solgt.');
   activeThread.bikeActive = false;
-  openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
   loadBikes();
   updateFilterCounts();
+  // Åbn købers profil direkte med vurderingsformular
+  openUserProfileWithReview(activeThread.otherId);
 }
 
 async function acceptBidFromInbox(content) {
@@ -2145,11 +2159,11 @@ async function acceptBidFromInbox(content) {
     supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
   }
 
-  showToast('🎉 Bud accepteret! Annoncen er markeret som solgt.');
   activeInboxThread.bikeActive = false;
-  openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
   loadBikes();
   updateFilterCounts();
+  // Åbn den andens profil direkte med vurderingsformular
+  openUserProfileWithReview(activeInboxThread.otherId);
 }
 
 function closeThread() {
@@ -3515,11 +3529,13 @@ async function markBikeSold(bikeId, buyerId, buyerName) {
       receiver_id: buyerId,
       content:     '✅ Handel bekræftet og accepteret! Tak for handlen – I kan nu vurdere hinanden.',
     });
-    showToast(`🎉 Solgt til ${buyerName}! I kan nu begge give en vurdering.`);
+    loadMyListings(); loadBikes(); updateFilterCounts();
+    // Åbn købers profil direkte med vurderingsformular
+    openUserProfileWithReview(buyerId);
   } else {
     showToast('🏷️ Annonce markeret som solgt');
+    loadMyListings(); loadBikes(); updateFilterCounts();
   }
-  loadMyListings(); loadBikes(); updateFilterCounts();
 }
 
 /* ============================================================
