@@ -577,11 +577,15 @@ async function openUserProfile(userId) {
     if (r1.error) console.warn('Profil-fejl:', r1.error);
 
     if (currentUser) {
-      const [msgA, msgB] = await Promise.all([
-        safe(supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', userId).limit(1)),
-        safe(supabase.from('messages').select('id').eq('sender_id', userId).eq('receiver_id', currentUser.id).limit(1)),
-      ]);
-      messagesCount = (msgA.data?.length || 0) + (msgB.data?.length || 0);
+      // hasTraded = der findes en budaccepterings-besked mellem de to brugere
+      const { data: tradeMsg } = await safe(
+        supabase.from('messages')
+          .select('id')
+          .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+          .ilike('content', '%accepteret%')
+          .limit(1)
+      );
+      messagesCount = tradeMsg?.length || 0;
     } else {
       messagesCount = 0;
     }
@@ -670,7 +674,7 @@ async function openUserProfile(userId) {
       <button class="btn-submit-review" onclick="submitReview('${userId}')">Send vurdering</button>
     </div>`
   : (!isOwnProfile && currentUser && !hasReviewed) ? `
-    <p class="up-empty" style="font-size:0.85rem;color:var(--muted);margin-top:8px;">Du kan kun vurdere brugere du har handlet med.</p>`
+    <p class="up-empty" style="font-size:0.85rem;color:var(--muted);margin-top:8px;">Du kan kun vurdere brugere du har handlet med via Cykelbørsen.</p>`
   : '';
 
   const upAvatarContent = profile.avatar_url
@@ -757,13 +761,14 @@ async function submitReview(reviewedUserId) {
   if (!currentUser)       { showToast('⚠️ Log ind for at give en vurdering'); return; }
   if (rating < 1)         { showToast('⚠️ Vælg et antal stjerner'); return; }
 
-  // Verificér at de to brugere har beskeder (= handlet) med hinanden
-  const [msgA, msgB] = await Promise.all([
-    supabase.from('messages').select('id').eq('sender_id', currentUser.id).eq('receiver_id', reviewedUserId).limit(1),
-    supabase.from('messages').select('id').eq('sender_id', reviewedUserId).eq('receiver_id', currentUser.id).limit(1),
-  ]);
-  const hasTraded = (msgA.data?.length || 0) + (msgB.data?.length || 0) > 0;
-  if (!hasTraded) { showToast('⚠️ Du kan kun vurdere brugere du har handlet med'); return; }
+  // Verificér at der er en budaccepterings-besked mellem de to brugere (= reel handel)
+  const { data: tradeMsg } = await supabase.from('messages')
+    .select('id')
+    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${reviewedUserId}),and(sender_id.eq.${reviewedUserId},receiver_id.eq.${currentUser.id})`)
+    .ilike('content', '%accepteret%')
+    .limit(1);
+  const hasTraded = tradeMsg?.length > 0;
+  if (!hasTraded) { showToast('⚠️ Du kan kun vurdere brugere du har handlet med via Cykelbørsen'); return; }
 
   const { error } = await supabase.from('reviews').insert({
     reviewer_id:      currentUser.id,
