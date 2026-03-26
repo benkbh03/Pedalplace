@@ -2072,6 +2072,22 @@ async function loadInbox() {
   }).join('');
 }
 
+// Fælles besked-renderer — bruges af openThread og openInboxThread
+function renderMessages(messages, isSeller, bikeActive, isInbox) {
+  return messages.map(msg => {
+    const isSent     = msg.sender_id === currentUser.id;
+    const isBid      = msg.content.startsWith('💰 Bud:') || msg.content.startsWith('💰');
+    const isAccepted = msg.content.startsWith('✅ Bud på');
+    const time       = new Date(msg.created_at).toLocaleString('da-DK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const acceptBtn  = (isBid && !isSent && isSeller && bikeActive)
+      ? `<button class="btn-accept-bid" onclick="acceptBid('${msg.content.replace(/'/g, "\\'")}', ${isInbox})">✅ Accepter bud</button>`
+      : '';
+    return `<div class="message-bubble ${isSent ? 'sent' : 'received'}${isBid ? ' bid-bubble' : ''}${isAccepted ? ' accepted-bubble' : ''}">
+      ${esc(msg.content)}${acceptBtn}<div class="msg-time">${time}</div>
+    </div>`;
+  }).join('');
+}
+
 async function openThread(bikeId, otherId, otherName) {
   activeThread = { bikeId, otherId, otherName };
 
@@ -2109,24 +2125,7 @@ async function openThread(bikeId, otherId, otherName) {
     return;
   }
 
-  threadEl.innerHTML = data.map(msg => {
-    const isSent    = msg.sender_id === currentUser.id;
-    const isBid     = msg.content.startsWith('💰 Bud:');
-    const isAccepted = msg.content.startsWith('✅ Bud på');
-    const time      = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-
-    // Vis "Accepter bud" knap kun for sælger på modtagne bud, mens annoncen er aktiv
-    const acceptBtn = (isBid && !isSent && isSeller && bikeActive)
-      ? `<button class="btn-accept-bid" onclick="acceptBid('${msg.content.replace(/'/g, "\\'")}')">✅ Accepter bud</button>`
-      : '';
-
-    return `
-      <div class="message-bubble ${isSent ? 'sent' : 'received'}${isBid ? ' bid-bubble' : ''}${isAccepted ? ' accepted-bubble' : ''}">
-        ${esc(msg.content)}
-        ${acceptBtn}
-        <div class="msg-time">${time}</div>
-      </div>`;
-  }).join('');
+  threadEl.innerHTML = renderMessages(data, isSeller, bikeActive, false);
 
   threadEl.scrollTop = threadEl.scrollHeight;
 
@@ -2137,44 +2136,9 @@ async function openThread(bikeId, otherId, otherName) {
     .eq('receiver_id', currentUser.id);
 }
 
-async function acceptBid(content) {
-  if (!activeThread?.isSeller || !activeThread?.bikeActive) return;
-
-  const match  = content.match(/💰 Bud: (.+) kr\./);
-  const amount = match ? match[1] + ' kr.' : 'buddet';
-
-  if (!confirm(`Vil du acceptere ${amount}?\nAnnoncen markeres som solgt og køber får besked.`)) return;
-
-  // Marker cykel som solgt
-  const { error: soldErr } = await supabase.from('bikes')
-    .update({ is_active: false })
-    .eq('id', activeThread.bikeId)
-    .eq('user_id', currentUser.id);
-
-  if (soldErr) { showToast('❌ Kunne ikke markere som solgt'); return; }
-
-  // Send bekræftelsesbesked til køber
-  const confirmContent = `✅ Bud på ${amount} accepteret! Kontakt hinanden for at aftale overdragelse.`;
-  const { data: inserted } = await supabase.from('messages').insert({
-    bike_id:     activeThread.bikeId,
-    sender_id:   currentUser.id,
-    receiver_id: activeThread.otherId,
-    content:     confirmContent,
-  }).select('id').single();
-
-  if (inserted?.id) {
-    supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
-  }
-
-  activeThread.bikeActive = false;
-  loadBikes();
-  updateFilterCounts();
-  // Åbn købers profil direkte med vurderingsformular
-  openUserProfileWithReview(activeThread.otherId);
-}
-
-async function acceptBidFromInbox(content) {
-  if (!activeInboxThread?.isSeller || !activeInboxThread?.bikeActive) return;
+async function acceptBid(content, isInbox = false) {
+  const thread = isInbox ? activeInboxThread : activeThread;
+  if (!thread?.isSeller || !thread?.bikeActive) return;
 
   const match  = content.match(/💰 Bud: (.+) kr\./);
   const amount = match ? match[1] + ' kr.' : 'buddet';
@@ -2183,16 +2147,16 @@ async function acceptBidFromInbox(content) {
 
   const { error: soldErr } = await supabase.from('bikes')
     .update({ is_active: false })
-    .eq('id', activeInboxThread.bikeId)
+    .eq('id', thread.bikeId)
     .eq('user_id', currentUser.id);
 
   if (soldErr) { showToast('❌ Kunne ikke markere som solgt'); return; }
 
   const confirmContent = `✅ Bud på ${amount} accepteret! Kontakt hinanden for at aftale overdragelse.`;
   const { data: inserted } = await supabase.from('messages').insert({
-    bike_id:     activeInboxThread.bikeId,
+    bike_id:     thread.bikeId,
     sender_id:   currentUser.id,
-    receiver_id: activeInboxThread.otherId,
+    receiver_id: thread.otherId,
     content:     confirmContent,
   }).select('id').single();
 
@@ -2200,11 +2164,10 @@ async function acceptBidFromInbox(content) {
     supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } }).catch(() => {});
   }
 
-  activeInboxThread.bikeActive = false;
+  thread.bikeActive = false;
   loadBikes();
   updateFilterCounts();
-  // Åbn den andens profil direkte med vurderingsformular
-  openUserProfileWithReview(activeInboxThread.otherId);
+  openUserProfileWithReview(thread.otherId);
 }
 
 function closeThread() {
@@ -2217,28 +2180,33 @@ function closeThread() {
 }
 
 
-async function sendReply() {
-  if (!activeThread || !currentUser) return;
-  const content = document.getElementById('reply-text').value.trim();
+async function sendReply(isInbox = false) {
+  const thread     = isInbox ? activeInboxThread : activeThread;
+  const textId     = isInbox ? 'inbox-modal-reply-text' : 'reply-text';
+  const btnId      = isInbox ? 'send-inbox-reply-btn'   : 'send-reply-btn';
+  const reopenFn   = isInbox ? openInboxThread : openThread;
+
+  if (!thread || !currentUser) return;
+  const content = document.getElementById(textId).value.trim();
   if (!content) { showToast('⚠️ Skriv et svar først'); return; }
 
-  const restore = btnLoading('send-reply-btn', 'Sender...');
+  const restore = btnLoading(btnId, 'Sender...');
   try {
     const { data: inserted, error } = await supabase.from('messages').insert({
-      bike_id:     activeThread.bikeId,
+      bike_id:     thread.bikeId,
       sender_id:   currentUser.id,
-      receiver_id: activeThread.otherId,
+      receiver_id: thread.otherId,
       content,
     }).select('id').single();
 
     if (error) { showToast('❌ Kunne ikke sende svar'); return; }
-    document.getElementById('reply-text').value = '';
+    document.getElementById(textId).value = '';
     showToast('✅ Svar sendt!');
     if (inserted?.id) {
       supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
         .catch(e => console.error('Email notifikation fejlede:', e));
     }
-    openThread(activeThread.bikeId, activeThread.otherId, activeThread.otherName);
+    reopenFn(thread.bikeId, thread.otherId, thread.otherName);
   } finally { restore(); }
 }
 
@@ -2885,12 +2853,10 @@ window.openThread         = openThread;
 window.closeThread        = closeThread;
 window.sendReply          = sendReply;
 window.acceptBid          = acceptBid;
-window.acceptBidFromInbox = acceptBidFromInbox;
 window.openInboxModal     = openInboxModal;
 window.closeInboxModal    = closeInboxModal;
 window.openInboxThread    = openInboxThread;
 window.closeInboxThread   = closeInboxThread;
-window.sendInboxReply     = sendInboxReply;
 window.loadInboxModal     = loadInboxModal;
 
 /* ============================================================
@@ -3031,19 +2997,7 @@ async function openInboxThread(bikeId, otherId, otherName) {
   const threadEl = document.getElementById('inbox-modal-thread-messages');
   if (error || !data) { threadEl.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente beskeder.</p>'; return; }
 
-  threadEl.innerHTML = data.map(function(msg) {
-    const isSent     = msg.sender_id === currentUser.id;
-    const time       = new Date(msg.created_at).toLocaleString('da-DK', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-    const isBid      = msg.content.indexOf('💰') === 0;
-    const isAccepted = msg.content.startsWith('✅ Bud på');
-    const showAccept = isBid && !isSent && isSeller && bikeActive;
-    const safeContent = msg.content.replace(/'/g, "\\'");
-    return '<div class="message-bubble ' + (isSent ? 'sent' : 'received') + (isBid ? ' bid-bubble' : '') + (isAccepted ? ' accepted-bubble' : '') + '">'
-      + esc(msg.content)
-      + '<div class="msg-time">' + time + '</div>'
-      + (showAccept ? '<button class="btn-accept-bid" onclick="acceptBidFromInbox(\'' + safeContent + '\')">✅ Accepter bud</button>' : '')
-      + '</div>';
-  }).join('');
+  threadEl.innerHTML = renderMessages(data, isSeller, bikeActive, true);
 
   threadEl.scrollTop = threadEl.scrollHeight;
 
@@ -3064,30 +3018,7 @@ function closeInboxThread() {
   loadInboxModal();
 }
 
-async function sendInboxReply() {
-  if (!activeInboxThread || !currentUser) return;
-  const content = document.getElementById('inbox-modal-reply-text').value.trim();
-  if (!content) { showToast('⚠️ Skriv et svar først'); return; }
-
-  const restore = btnLoading('send-inbox-reply-btn', 'Sender...');
-  try {
-    const { data: inserted, error } = await supabase.from('messages').insert({
-      bike_id:     activeInboxThread.bikeId,
-      sender_id:   currentUser.id,
-      receiver_id: activeInboxThread.otherId,
-      content:     content,
-    }).select('id').single();
-
-    if (error) { showToast('❌ Kunne ikke sende svar'); return; }
-    document.getElementById('inbox-modal-reply-text').value = '';
-    showToast('✅ Svar sendt!');
-    if (inserted?.id) {
-      supabase.functions.invoke('notify-message', { body: { message_id: inserted.id } })
-        .catch(e => console.error('Email notifikation fejlede:', e));
-    }
-    openInboxThread(activeInboxThread.bikeId, activeInboxThread.otherId, activeInboxThread.otherName);
-  } finally { restore(); }
-}
+// sendInboxReply er slået sammen med sendReply(isInbox=true)
 
 async function updateInboxBadge() {
   if (!currentUser) return;
@@ -3121,7 +3052,6 @@ window.openSubscriptionPortal  = openSubscriptionPortal;
 window.closeInboxModal  = closeInboxModal;
 window.openInboxThread  = openInboxThread;
 window.closeInboxThread = closeInboxThread;
-window.sendInboxReply   = sendInboxReply;
 
 /* ============================================================
    FOOTER MODALER
