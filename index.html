@@ -129,7 +129,7 @@
         <div id="autocomplete-list" class="autocomplete-list" style="display:none;" role="listbox" aria-label="Søgeforslag"></div>
       </div>
       <label for="search-type" class="sr-only">Vælg cykeltype</label>
-      <select id="search-type" aria-label="Filtrer efter cykeltype">
+      <select id="search-type" aria-label="Filtrer efter cykeltype" onchange="searchBikes()">
         <option value="">Alle typer</option>
         <option>Racercykel</option>
         <option>Mountainbike</option>
@@ -139,7 +139,7 @@
         <option>Børnecykel</option>
       </select>
       <label for="search-city" class="sr-only">Vælg by</label>
-      <select id="search-city" aria-label="Filtrer efter by">
+      <select id="search-city" aria-label="Filtrer efter by" onchange="searchBikes()">
         <option value="">Alle steder</option>
         <option>København</option>
         <option>Aarhus</option>

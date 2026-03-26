@@ -38,6 +38,12 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+// Hjælper: escap HTML for at forhindre XSS
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // Hjælper: focus trap — returnerer cleanup-funktion
 function trapFocus(modalEl) {
   const focusable = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -690,7 +696,7 @@ async function openUserProfile(userId) {
           </div>
           <div class="up-review-date">${date}</div>
         </div>
-        ${r.comment ? `<p class="up-review-comment">${r.comment}</p>` : ''}
+        ${r.comment ? `<p class="up-review-comment">${esc(r.comment)}</p>` : ''}
       </div>`;
   }).join('') || `<p class="up-empty">Ingen vurderinger endnu.</p>`;
 
@@ -1038,11 +1044,15 @@ async function toggleSave(btn, bikeId) {
   if (!currentUser) { showToast('⚠️ Log ind for at gemme annoncer'); return; }
   const isSaved = btn.textContent === '❤️';
   if (isSaved) {
-    await supabase.from('saved_bikes').delete().eq('user_id', currentUser.id).eq('bike_id', bikeId);
+    const { error } = await supabase.from('saved_bikes').delete().eq('user_id', currentUser.id).eq('bike_id', bikeId);
+    if (error) { showToast('❌ Kunne ikke fjerne fra gemte'); return; }
     btn.textContent = '🤍';
+    showToast('Fjernet fra gemte');
   } else {
-    await supabase.from('saved_bikes').insert({ user_id: currentUser.id, bike_id: bikeId });
+    const { error } = await supabase.from('saved_bikes').insert({ user_id: currentUser.id, bike_id: bikeId });
+    if (error) { showToast('❌ Kunne ikke gemme annonce'); return; }
     btn.textContent = '❤️';
+    showToast('❤️ Gemt! Find den under Gemte i din profil.');
   }
 }
 
@@ -1490,14 +1500,28 @@ async function loadSavedListings() {
     const b = s.bikes;
     if (!b) return '';
     return `
-      <div class="my-listing-row">
+      <div class="my-listing-row" style="cursor:pointer;" onclick="openBikeModal('${s.bike_id}')">
         <div class="my-listing-info">
-          <div class="my-listing-title">${b.brand} ${b.model}</div>
-          <div class="my-listing-meta">${b.type} · ${b.city} · ${b.condition}</div>
+          <div class="my-listing-title">${esc(b.brand)} ${esc(b.model)}</div>
+          <div class="my-listing-meta">${esc(b.type)} · ${esc(b.city)} · ${esc(b.condition)}</div>
         </div>
         <div class="my-listing-price">${b.price.toLocaleString('da-DK')} kr.</div>
+        <button class="btn-delete" onclick="event.stopPropagation();removeSaved('${s.bike_id}',this)" title="Fjern fra gemte">🗑️</button>
       </div>`;
   }).join('');
+}
+
+async function removeSaved(bikeId, btn) {
+  if (!currentUser) return;
+  const { error } = await supabase.from('saved_bikes').delete().eq('user_id', currentUser.id).eq('bike_id', bikeId);
+  if (error) { showToast('❌ Kunne ikke fjerne annonce'); return; }
+  showToast('Fjernet fra gemte');
+  btn.closest('.my-listing-row').remove();
+  // Vis tom-tekst hvis ingen tilbage
+  const grid = document.getElementById('my-saved-grid');
+  if (grid && !grid.querySelector('.my-listing-row')) {
+    grid.innerHTML = '<p style="color:var(--muted)">Du har ikke gemt nogen annoncer endnu.</p>';
+  }
 }
 
 /* ============================================================
@@ -1740,7 +1764,7 @@ async function openBikeModal(bikeId) {
     ${b.description ? `
     <div style="margin-top:20px;">
       <h3 style="font-family:'Fraunces',serif;font-size:1rem;margin-bottom:10px;">Beskrivelse</h3>
-      <div class="bike-detail-description">${b.description.replace(/\n/g, '<br>')}</div>
+      <div class="bike-detail-description">${esc(b.description).replace(/\n/g, '<br>')}</div>
     </div>` : ''}
   `;
 
@@ -2098,7 +2122,7 @@ async function openThread(bikeId, otherId, otherName) {
 
     return `
       <div class="message-bubble ${isSent ? 'sent' : 'received'}${isBid ? ' bid-bubble' : ''}${isAccepted ? ' accepted-bubble' : ''}">
-        ${msg.content}
+        ${esc(msg.content)}
         ${acceptBtn}
         <div class="msg-time">${time}</div>
       </div>`;
@@ -2819,6 +2843,7 @@ window.uploadAvatar      = uploadAvatar;
 window.deleteListing     = deleteListing;
 window.togglePill        = togglePill;
 window.toggleSave        = toggleSave;
+window.removeSaved       = removeSaved;
 window.showSection       = showSection;
 window.logout                  = logout;
 window.resendConfirmationEmail = resendConfirmationEmail;
@@ -3014,7 +3039,7 @@ async function openInboxThread(bikeId, otherId, otherName) {
     const showAccept = isBid && !isSent && isSeller && bikeActive;
     const safeContent = msg.content.replace(/'/g, "\\'");
     return '<div class="message-bubble ' + (isSent ? 'sent' : 'received') + (isBid ? ' bid-bubble' : '') + (isAccepted ? ' accepted-bubble' : '') + '">'
-      + msg.content
+      + esc(msg.content)
       + '<div class="msg-time">' + time + '</div>'
       + (showAccept ? '<button class="btn-accept-bid" onclick="acceptBidFromInbox(\'' + safeContent + '\')">✅ Accepter bud</button>' : '')
       + '</div>';
@@ -3384,7 +3409,7 @@ async function searchAutocomplete(query) {
 
   if (!query || query.length < 2) { list.style.display = 'none'; return; }
 
-  autocompleteTimeout = setTimeout(async function() {
+  autocompleteTimeout = setTimeout(async function() { // 300ms debounce
     var result = await supabase
       .from('bikes')
       .select('brand, model, type, price')
@@ -3393,7 +3418,7 @@ async function searchAutocomplete(query) {
       .limit(8);
 
     if (!result.data || result.data.length === 0) {
-      list.innerHTML = '<div class="autocomplete-no-results">Ingen resultater for "<strong>' + query.replace(/</g, '&lt;') + '</strong>"</div>';
+      list.innerHTML = '<div class="autocomplete-no-results">Ingen resultater for "<strong>' + esc(query) + '</strong>"</div>';
       list.style.display = 'block';
       return;
     }
@@ -3408,17 +3433,21 @@ async function searchAutocomplete(query) {
     });
 
     autocompleteIndex = -1;
+    // Escape query til regex og HTML — forhindrer XSS via søgefeltet
+    var safeQueryRegex = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var safeQueryHtml  = esc(query);
     list.innerHTML = items.map(function(b, i) {
-      var display = b.brand + ' ' + b.model;
-      var highlighted = display.replace(new RegExp('(' + query + ')', 'gi'), '<strong>$1</strong>');
-      return '<div class="autocomplete-item" data-index="' + i + '" onclick="selectAutocomplete(\'' + (b.brand + ' ' + b.model).replace(/'/g, '') + '\')">'
+      var display     = esc(b.brand + ' ' + b.model);
+      var highlighted = display.replace(new RegExp('(' + safeQueryRegex + ')', 'gi'), '<strong>$1</strong>');
+      var selectVal   = (b.brand + ' ' + b.model).replace(/'/g, '');
+      return '<div class="autocomplete-item" data-index="' + i + '" onclick="selectAutocomplete(\'' + selectVal + '\')">'
         + '🚲 ' + highlighted
-        + '<span class="autocomplete-meta">' + b.type + ' · ' + b.price.toLocaleString('da-DK') + ' kr.</span>'
+        + '<span class="autocomplete-meta">' + esc(b.type) + ' · ' + b.price.toLocaleString('da-DK') + ' kr.</span>'
         + '</div>';
     }).join('');
 
     list.style.display = 'block';
-  }, 200);
+  }, 300);
 }
 
 function selectAutocomplete(value) {
