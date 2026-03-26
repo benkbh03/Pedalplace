@@ -126,11 +126,28 @@ async function init() {
       var adminBtn = document.getElementById('nav-admin');
       if (adminBtn) adminBtn.style.display = profile?.is_admin ? 'flex' : 'none';
       checkEmailConfirmed();
+      // Token refreshet eller ny login — opdater annoncerne
+      if (_event === 'TOKEN_REFRESHED' || _event === 'SIGNED_IN') {
+        loadBikes();
+        updateFilterCounts();
+      }
     } else {
       currentUser    = null;
       currentProfile = null;
       updateNav(false);
+      // Session udløbet — reload siden for at rydde stale state
+      if (_event === 'SIGNED_OUT') {
+        window.location.href = window.location.pathname;
+      }
     }
+  });
+
+  // Refresh session + data når bruger vender tilbage til fanen (Supabase refresher ikke tokens i inaktive tabs)
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    await supabase.auth.getSession(); // trigger token-refresh hvis udløbet
+    loadBikes();
+    updateFilterCounts();
   });
 
   // Åbn indbakke automatisk hvis ?inbox=true er i URL'en
