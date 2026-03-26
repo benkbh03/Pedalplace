@@ -1611,6 +1611,7 @@ async function openBikeModal(bikeId) {
     galleryHtml = `
       <div class="bike-gallery">
         <div class="gallery-main">
+          <div class="gallery-main-bg" id="gallery-main-bg" style="background-image:url('${allImages[0].url}')"></div>
           <img id="gallery-main-img" src="${allImages[0].url}" alt="${b.brand} ${b.model}">
           <button class="gallery-nav-btn gallery-prev" onclick="galleryNav(-1)" aria-label="Forrige billede">&#8249;</button>
           <button class="gallery-nav-btn gallery-next" onclick="galleryNav(1)" aria-label="Næste billede">&#8250;</button>
@@ -1783,6 +1784,8 @@ function galleryGoto(index) {
     setTimeout(() => {
       mainImg.src = images[window._galleryIndex];
       mainImg.style.opacity = '1';
+      const bg = document.getElementById('gallery-main-bg');
+      if (bg) bg.style.backgroundImage = `url('${images[window._galleryIndex]}')`;
     }, 150);
   }
   const counter = document.getElementById('gallery-counter');
