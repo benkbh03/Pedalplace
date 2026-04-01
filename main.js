@@ -132,10 +132,9 @@ async function init() {
       var adminBtn = document.getElementById('nav-admin');
       if (adminBtn) adminBtn.style.display = profile?.is_admin ? 'flex' : 'none';
       checkEmailConfirmed();
-      // Token refreshet eller ny login — opdater annoncerne
-      if (_event === 'TOKEN_REFRESHED' || _event === 'SIGNED_IN') {
+      // Nyt login — opdater annoncerne (TOKEN_REFRESHED håndteres af visibilitychange)
+      if (_event === 'SIGNED_IN') {
         loadBikes();
-        updateFilterCounts();
       }
     } else {
       currentUser    = null;
@@ -148,12 +147,17 @@ async function init() {
     }
   });
 
-  // Refresh session + data når bruger vender tilbage til fanen (Supabase refresher ikke tokens i inaktive tabs)
+  // Refresh session + data når bruger vender tilbage til fanen
+  // Debounce: forhindrer spam ved hurtig tab-switch
+  let _visibilityTimeout = null;
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
-    await supabase.auth.getSession(); // trigger token-refresh hvis udløbet
-    loadBikes();
-    updateFilterCounts();
+    clearTimeout(_visibilityTimeout);
+    _visibilityTimeout = setTimeout(async () => {
+      await supabase.auth.getSession(); // trigger token-refresh hvis udløbet
+      loadBikes();
+      // updateFilterCounts opdateres kun ved initial load og efter mutationer
+    }, 500);
   });
 
   // Åbn indbakke automatisk hvis ?inbox=true er i URL'en
@@ -601,7 +605,7 @@ async function openUserProfile(userId) {
 
     const [r1, r2, r3, r4] = await Promise.all([
       safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url').eq('id', userId).single()),
-      safe(supabase.from('bikes').select('*, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
+      safe(supabase.from('bikes').select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
     ]);
@@ -846,7 +850,8 @@ async function loadBikes(filters = {}, append = false) {
 
   let query = supabase
     .from('bikes')
-    .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
+    .select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, user_id, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
+    .eq('is_active', true)
     .order('created_at', { ascending: false })
     .range(bikesOffset, bikesOffset + BIKES_PAGE_SIZE - 1);
 
@@ -2268,7 +2273,7 @@ async function loadBikesWithFilters({ types = [], conditions = [], minPrice, max
 
   let query = supabase
     .from('bikes')
-    .select('*, profiles(name, seller_type, shop_name), bike_images(url, is_primary)')
+    .select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, user_id, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(96);
