@@ -39,6 +39,19 @@ function debounce(fn, ms) {
 }
 
 // Hjælper: escap HTML for at forhindre XSS
+function formatLastSeen(dateStr) {
+  if (!dateStr) return null;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 5)   return 'Netop aktiv';
+  if (mins < 60)  return `Aktiv for ${mins} min. siden`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `Aktiv for ${hrs} ${hrs === 1 ? 'time' : 'timer'} siden`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7)   return `Aktiv for ${days} ${days === 1 ? 'dag' : 'dage'} siden`;
+  return 'Aktiv for over en uge siden';
+}
+
 function esc(str) {
   if (str == null) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -117,6 +130,8 @@ async function init() {
       if (adminBtn) adminBtn.style.display = 'flex';
     }
     checkEmailConfirmed();
+    // Opdater last_seen (fire-and-forget)
+    supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id).then(null, () => {});
   } else {
     updateNav(false);
   }
@@ -156,6 +171,10 @@ async function init() {
     _visibilityTimeout = setTimeout(async () => {
       await supabase.auth.getSession(); // trigger token-refresh hvis udløbet
       loadBikes();
+      // Opdater last_seen når brugeren vender tilbage til fanen
+      if (currentUser) {
+        supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id).then(null, () => {});
+      }
       // updateFilterCounts opdateres kun ved initial load og efter mutationer
     }, 500);
   });
@@ -604,7 +623,7 @@ async function openUserProfile(userId) {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
     const [r1, r2, r3, r4] = await Promise.all([
-      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url').eq('id', userId).single()),
+      safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url, last_seen, bio').eq('id', userId).single()),
       safe(supabase.from('bikes').select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
@@ -646,6 +665,7 @@ async function openUserProfile(userId) {
   const isDealer     = profile.seller_type === 'dealer';
   const memberYear   = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
   const isOwnProfile = currentUser && currentUser.id === userId;
+  const lastSeenText = !isOwnProfile ? formatLastSeen(profile.last_seen) : null;
 
   // Gennemsnit og anmeldelsesantal
   const reviewList   = reviews || [];
@@ -733,10 +753,12 @@ async function openUserProfile(userId) {
           ${profile.id_verified ? '<span class="id-badge" title="ID verificeret">🪪</span>' : ''}
         </h2>
         ${isDealer && profile.address ? `<div class="up-city">📍 ${profile.address}${profile.city ? ', ' + profile.city : ''}</div>` : profile.city ? `<div class="up-city">📍 ${profile.city}</div>` : ''}
+        ${lastSeenText ? `<div class="up-last-seen">🕐 ${lastSeenText}</div>` : ''}
         <div class="up-badges">
           <span class="badge ${isDealer ? 'badge-dealer' : 'badge-private'}">${isDealer ? '🏪 Forhandler' : '👤 Privat sælger'}</span>
           ${memberYear ? `<span class="up-member-since">Medlem siden ${memberYear}</span>` : ''}
         </div>
+        ${profile.bio ? `<p class="up-bio">${esc(profile.bio)}</p>` : ''}
       </div>
     </div>
 
@@ -1182,6 +1204,11 @@ async function submitListing() {
   showToast('✅ Din annonce er oprettet!');
   loadBikes();
   updateFilterCounts();
+
+  // Notificér brugere med matchende gemte søgninger (fire-and-forget)
+  supabase.functions.invoke('notify-saved-searches', {
+    body: { bike: { id: newBike.id, brand: newBike.brand, model: newBike.model, type: newBike.type, city: newBike.city, price: newBike.price, condition: newBike.condition } },
+  }).catch(() => {});
   } finally { restore(); }
 }
 
@@ -1326,6 +1353,8 @@ function showProfileData() {
   document.getElementById('edit-seller-type').value = profile.seller_type || 'private';
   document.getElementById('edit-shop-name').value   = profile.shop_name || '';
   document.getElementById('edit-address').value     = profile.address || '';
+  const bioEl = document.getElementById('edit-bio');
+  if (bioEl) bioEl.value = profile.bio || '';
 
   const shopGroup    = document.getElementById('edit-shop-group');
   const addressGroup = document.getElementById('edit-address-group');
@@ -1385,6 +1414,7 @@ async function saveProfile() {
     seller_type: currentProfile?.seller_type || 'private', // sælgertype ændres kun via forhandler-flow
     shop_name:   document.getElementById('edit-shop-name').value,
     address:     document.getElementById('edit-address').value,
+    bio:         (document.getElementById('edit-bio')?.value || '').trim(),
   };
 
   const restore = btnLoading('save-profile-btn', 'Gemmer...');
