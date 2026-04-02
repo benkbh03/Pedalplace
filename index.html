@@ -147,6 +147,7 @@
         <option>Aalborg</option>
       </select>
       <button onclick="searchBikes()" aria-label="Søg efter cykler">🔍 Søg</button>
+      <button id="save-search-btn" onclick="saveCurrentSearch()" title="Gem denne søgning" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;cursor:pointer;font-size:1.1rem;color:var(--muted);transition:border-color 0.15s,color 0.15s;" aria-label="Gem søgning">🔔</button>
     </div>
   </div>
 
@@ -530,6 +531,7 @@
           <button class="profile-tab active" id="ptab-info" onclick="switchProfileTab('info')">Oplysninger</button>
           <button class="profile-tab" id="ptab-listings" onclick="switchProfileTab('listings')">Mine annoncer</button>
           <button class="profile-tab" id="ptab-saved" onclick="switchProfileTab('saved')">Gemte</button>
+          <button class="profile-tab" id="ptab-searches" onclick="switchProfileTab('searches')">Søgninger</button>
           <button class="profile-tab" id="ptab-inbox" onclick="switchProfileTab('inbox')">Indbakke <span id="inbox-badge" class="inbox-badge" style="display:none"></span></button>
         </div>
 
@@ -623,6 +625,13 @@
         <div id="profile-saved" style="display:none;">
           <div id="my-saved-grid" class="my-listings-grid">
             <p style="color:var(--muted)">Indlæser gemte annoncer...</p>
+          </div>
+        </div>
+
+        <!-- Gemte søgninger -->
+        <div id="profile-searches" style="display:none;">
+          <div id="my-searches-list">
+            <p style="color:var(--muted)">Indlæser gemte søgninger...</p>
           </div>
         </div>
 

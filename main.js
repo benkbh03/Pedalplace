@@ -1365,12 +1365,13 @@ function showProfileData() {
 }
 
 function switchProfileTab(tab) {
-  ['info', 'listings', 'saved', 'inbox'].forEach(t => {
+  ['info', 'listings', 'saved', 'searches', 'inbox'].forEach(t => {
     document.getElementById(`profile-${t}`).style.display = t === tab ? 'block' : 'none';
     document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
   });
   if (tab === 'listings') loadMyListings();
   if (tab === 'saved')    loadSavedListings();
+  if (tab === 'searches') loadSavedSearches();
   if (tab === 'inbox')    loadInbox();
 }
 
@@ -1458,10 +1459,12 @@ async function loadMyListings() {
 
   grid.innerHTML = data.map(b => {
     var isSold = !b.is_active;
+    var views  = b.views || 0;
     return `<div class="my-listing-row" style="${isSold ? 'opacity:0.65' : ''}">
       <div class="my-listing-info">
         <div class="my-listing-title">${b.brand} ${b.model} ${isSold ? '<span style="background:var(--charcoal);color:#fff;font-size:.68rem;padding:2px 7px;border-radius:4px;vertical-align:middle;">SOLGT</span>' : ''}</div>
         <div class="my-listing-meta">${b.type} · ${b.city} · ${b.condition}</div>
+        <div class="my-listing-views">👁 ${views.toLocaleString('da-DK')} visninger</div>
       </div>
       <div class="my-listing-price">${b.price.toLocaleString('da-DK')} kr.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1526,6 +1529,99 @@ async function removeSaved(bikeId, btn) {
   const grid = document.getElementById('my-saved-grid');
   if (grid && !grid.querySelector('.my-listing-row')) {
     grid.innerHTML = '<p style="color:var(--muted)">Du har ikke gemt nogen annoncer endnu.</p>';
+  }
+}
+
+/* ============================================================
+   GEMTE SØGNINGER
+   ============================================================ */
+
+async function saveCurrentSearch() {
+  if (!currentUser) { showToast('⚠️ Log ind for at gemme søgninger'); return; }
+
+  const search = document.getElementById('search-input').value.trim();
+  const type   = document.getElementById('search-type').value;
+  const city   = document.getElementById('search-city').value;
+
+  if (!search && !type && !city) { showToast('⚠️ Ingen aktive filtre at gemme'); return; }
+
+  // Lav et læsevenligt navn
+  const parts = [search, type, city].filter(Boolean);
+  const name  = parts.join(' · ') || 'Min søgning';
+
+  const { error } = await supabase.from('saved_searches').insert({
+    user_id: currentUser.id,
+    name,
+    filters: { search, type, city },
+  });
+
+  if (error) { showToast('❌ Kunne ikke gemme søgning'); return; }
+  showToast('🔔 Søgning gemt! Du finder den under "Søgninger" i din profil.');
+
+  // Fremhæv knappen kortvarigt
+  const btn = document.getElementById('save-search-btn');
+  if (btn) { btn.style.color = 'var(--rust)'; btn.style.borderColor = 'var(--rust)'; setTimeout(() => { btn.style.color = ''; btn.style.borderColor = ''; }, 2000); }
+}
+
+async function loadSavedSearches() {
+  if (!currentUser) return;
+  const list = document.getElementById('my-searches-list');
+  const { data, error } = await supabase
+    .from('saved_searches')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false });
+
+  if (error) { list.innerHTML = retryHTML('Kunne ikke hente gemte søgninger.', 'loadSavedSearches'); return; }
+  if (!data || data.length === 0) {
+    list.innerHTML = `<p style="color:var(--muted)">Ingen gemte søgninger endnu. Brug 🔔 knappen ved søgefeltet for at gemme en søgning.</p>`;
+    return;
+  }
+
+  list.innerHTML = data.map(s => {
+    const f = s.filters || {};
+    const tags = [f.search, f.type, f.city].filter(Boolean).map(t =>
+      `<span style="background:var(--border);border-radius:4px;padding:2px 8px;font-size:0.75rem;">${esc(t)}</span>`
+    ).join(' ');
+    return `
+      <div class="my-listing-row">
+        <div class="my-listing-info" style="cursor:pointer;" onclick="applySavedSearch('${s.id}')">
+          <div class="my-listing-title">${esc(s.name)}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${tags}</div>
+          <div class="my-listing-meta" style="margin-top:4px;">${new Date(s.created_at).toLocaleDateString('da-DK', { day:'numeric', month:'short', year:'numeric' })}</div>
+        </div>
+        <button class="btn-delete" onclick="deleteSavedSearch('${s.id}', this)" title="Slet søgning">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+async function applySavedSearch(searchId) {
+  const { data } = await supabase.from('saved_searches').select('filters').eq('id', searchId).single();
+  if (!data) return;
+  const f = data.filters || {};
+
+  // Udfyld søgefelter
+  const inp  = document.getElementById('search-input');
+  const type = document.getElementById('search-type');
+  const city = document.getElementById('search-city');
+  if (inp)  inp.value  = f.search || '';
+  if (type) type.value = f.type   || '';
+  if (city) city.value = f.city   || '';
+
+  // Luk profil-modal og søg
+  closeProfileModal();
+  searchBikes();
+  showToast('🔍 Søgning genaktiveret');
+}
+
+async function deleteSavedSearch(id, btn) {
+  const { error } = await supabase.from('saved_searches').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (error) { showToast('❌ Kunne ikke slette søgning'); return; }
+  btn.closest('.my-listing-row').remove();
+  showToast('Søgning slettet');
+  const list = document.getElementById('my-searches-list');
+  if (list && !list.querySelector('.my-listing-row')) {
+    list.innerHTML = `<p style="color:var(--muted)">Ingen gemte søgninger endnu.</p>`;
   }
 }
 
@@ -1643,6 +1739,11 @@ async function openBikeModal(bikeId) {
     error = e;
   }
 
+  // Tæl visning (fire-and-forget, kun ikke-ejere)
+  if (b && (!currentUser || currentUser.id !== b.user_id)) {
+    supabase.rpc('increment_bike_views', { bike_id: bikeId }).catch(() => {});
+  }
+
   if (error || !b) {
     document.getElementById('bike-modal-body').innerHTML = `
       <div style="text-align:center;padding:40px 20px;">
@@ -1739,9 +1840,12 @@ async function openBikeModal(bikeId) {
           <div style="flex:1">
             <div class="seller-detail-name">${sellerName || 'Ukendt'}${profile.verified ? ' <span class="verified-badge-large" title="Verificeret forhandler">✓</span>' : ''}${profile.id_verified ? ' <span class="id-badge" title="ID verificeret">🪪</span>' : ''}</div>
             <div class="seller-detail-city">${profile.city || ''}</div>
-            <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
-              ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
-            </span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+              <span class="badge ${sellerType === 'dealer' ? 'badge-dealer' : 'badge-private'}">
+                ${sellerType === 'dealer' ? '🏪 Forhandler' : '👤 Privat'}
+              </span>
+              <span id="response-time-badge" style="font-size:0.75rem;color:var(--muted);">⏱ Henter responstid...</span>
+            </div>
           </div>
           <div style="color:var(--muted);font-size:0.8rem;align-self:center;">Se profil →</div>
         </div>
@@ -1775,6 +1879,61 @@ async function openBikeModal(bikeId) {
 
   // Tilknyt swipe-navigation på mobil
   attachGallerySwipe();
+
+  // Hent responstid for sælger (asynkront efter render)
+  loadResponseTime(profile.id);
+}
+
+async function loadResponseTime(sellerId) {
+  const badge = document.getElementById('response-time-badge');
+  if (!badge) return;
+
+  // Hent sælgers udgående beskeder (svar) og find gennemsnitlig responstid
+  const { data } = await supabase
+    .from('messages')
+    .select('created_at, bike_id, sender_id, receiver_id')
+    .eq('sender_id', sellerId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (!data || data.length < 3) {
+    badge.textContent = '';
+    return;
+  }
+
+  // Find tråde hvor sælger svarede på en indgående besked
+  const { data: received } = await supabase
+    .from('messages')
+    .select('created_at, bike_id, sender_id')
+    .eq('receiver_id', sellerId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (!received || received.length === 0) { badge.textContent = ''; return; }
+
+  // Beregn responstid per tråd
+  const responseTimes = [];
+  received.forEach(inMsg => {
+    const reply = data.find(outMsg =>
+      outMsg.bike_id === inMsg.bike_id &&
+      new Date(outMsg.created_at) > new Date(inMsg.created_at)
+    );
+    if (reply) {
+      const mins = (new Date(reply.created_at) - new Date(inMsg.created_at)) / 60000;
+      if (mins > 0 && mins < 60 * 24 * 7) responseTimes.push(mins); // max 1 uge
+    }
+  });
+
+  if (responseTimes.length < 2) { badge.textContent = ''; return; }
+
+  const avgMins = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+  let label;
+  if (avgMins < 60)        label = `Svarer typisk inden for en time`;
+  else if (avgMins < 360)  label = `Svarer typisk inden for ${Math.round(avgMins / 60)} timer`;
+  else if (avgMins < 1440) label = `Svarer typisk samme dag`;
+  else                     label = `Svarer typisk inden for ${Math.round(avgMins / 1440)} dage`;
+
+  badge.textContent = `⏱ ${label}`;
 }
 
 /* ── Rapporter annonce ── */
@@ -2817,6 +2976,9 @@ window.deleteListing     = deleteListing;
 window.togglePill        = togglePill;
 window.toggleSave        = toggleSave;
 window.removeSaved       = removeSaved;
+window.saveCurrentSearch  = saveCurrentSearch;
+window.applySavedSearch   = applySavedSearch;
+window.deleteSavedSearch  = deleteSavedSearch;
 window.showSection       = showSection;
 window.logout                  = logout;
 window.resendConfirmationEmail = resendConfirmationEmail;
