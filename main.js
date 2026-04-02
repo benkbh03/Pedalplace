@@ -1918,13 +1918,21 @@ async function openBikeModal(bikeId) {
       <h3 style="font-family:'Fraunces',serif;font-size:1rem;margin-bottom:10px;">Beskrivelse</h3>
       <div class="bike-detail-description">${esc(b.description).replace(/\n/g, '<br>')}</div>
     </div>` : ''}
+
+    <!-- Sælgerens andre annoncer -->
+    <div id="seller-other-listings" style="margin-top:28px;"></div>
+
+    <!-- Lignende annoncer -->
+    <div id="similar-listings" style="margin-top:24px;"></div>
   `;
 
   // Tilknyt swipe-navigation på mobil
   attachGallerySwipe();
 
-  // Hent responstid for sælger (asynkront efter render)
+  // Hent responstid, sælgers andre annoncer og lignende (asynkront efter render)
   loadResponseTime(profile.id);
+  loadSellerOtherListings(profile.id, b.id);
+  loadSimilarListings(b.type, b.id);
 
   } catch (renderErr) {
     console.error('Fejl ved rendering af annonce:', renderErr);
@@ -1986,6 +1994,88 @@ async function loadResponseTime(sellerId) {
   } catch (e) {
     console.error('Fejl ved loadResponseTime:', e);
     badge.textContent = '';
+  }
+}
+
+/* ── Sælgerens andre annoncer ── */
+
+async function loadSellerOtherListings(sellerId, currentBikeId) {
+  const wrap = document.getElementById('seller-other-listings');
+  if (!wrap || !sellerId) return;
+
+  try {
+    const { data } = await supabase
+      .from('bikes')
+      .select('id, brand, model, price, type, condition, bike_images(url, is_primary)')
+      .eq('user_id', sellerId)
+      .eq('is_active', true)
+      .neq('id', currentBikeId)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (!data || data.length === 0) return; // Ingen andre annoncer — skjul sektionen
+
+    const cards = data.map(bike => {
+      const img = bike.bike_images?.find(i => i.is_primary)?.url || bike.bike_images?.[0]?.url;
+      return `
+        <div class="related-card" onclick="openBikeModal('${bike.id}')">
+          <div class="related-card-img">
+            ${img ? `<img src="${img}" alt="${esc(bike.brand)} ${esc(bike.model)}" loading="lazy">` : '<span style="font-size:2rem">🚲</span>'}
+          </div>
+          <div class="related-card-info">
+            <div class="related-card-title">${esc(bike.brand)} ${esc(bike.model)}</div>
+            <div class="related-card-price">${bike.price.toLocaleString('da-DK')} kr.</div>
+            <div class="related-card-meta">${esc(bike.condition || '')}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <h3 class="related-section-title">Sælgerens andre annoncer</h3>
+      <div class="related-grid">${cards}</div>`;
+  } catch (e) {
+    console.error('loadSellerOtherListings fejl:', e);
+  }
+}
+
+/* ── Lignende annoncer ── */
+
+async function loadSimilarListings(bikeType, currentBikeId) {
+  const wrap = document.getElementById('similar-listings');
+  if (!wrap || !bikeType) return;
+
+  try {
+    const { data } = await supabase
+      .from('bikes')
+      .select('id, brand, model, price, type, condition, bike_images(url, is_primary)')
+      .eq('type', bikeType)
+      .eq('is_active', true)
+      .neq('id', currentBikeId)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (!data || data.length === 0) return;
+
+    const cards = data.map(bike => {
+      const img = bike.bike_images?.find(i => i.is_primary)?.url || bike.bike_images?.[0]?.url;
+      return `
+        <div class="related-card" onclick="openBikeModal('${bike.id}')">
+          <div class="related-card-img">
+            ${img ? `<img src="${img}" alt="${esc(bike.brand)} ${esc(bike.model)}" loading="lazy">` : '<span style="font-size:2rem">🚲</span>'}
+          </div>
+          <div class="related-card-info">
+            <div class="related-card-title">${esc(bike.brand)} ${esc(bike.model)}</div>
+            <div class="related-card-price">${bike.price.toLocaleString('da-DK')} kr.</div>
+            <div class="related-card-meta">${esc(bike.condition || '')}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <h3 class="related-section-title">Lignende annoncer</h3>
+      <div class="related-grid">${cards}</div>`;
+  } catch (e) {
+    console.error('loadSimilarListings fejl:', e);
   }
 }
 
