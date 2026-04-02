@@ -1457,23 +1457,28 @@ async function loadMyListings() {
     return;
   }
 
-  grid.innerHTML = data.map(b => {
-    var isSold = !b.is_active;
-    var views  = b.views || 0;
-    return `<div class="my-listing-row" style="${isSold ? 'opacity:0.65' : ''}">
-      <div class="my-listing-info">
-        <div class="my-listing-title">${b.brand} ${b.model} ${isSold ? '<span style="background:var(--charcoal);color:#fff;font-size:.68rem;padding:2px 7px;border-radius:4px;vertical-align:middle;">SOLGT</span>' : ''}</div>
-        <div class="my-listing-meta">${b.type} · ${b.city} · ${b.condition}</div>
-        <div class="my-listing-views">👁 ${views.toLocaleString('da-DK')} visninger</div>
-      </div>
-      <div class="my-listing-price">${b.price.toLocaleString('da-DK')} kr.</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${!isSold ? `<button class="btn-sold" onclick="toggleSold('${b.id}', false)">Sæt solgt</button>` : `<button class="btn-unsold" onclick="toggleSold('${b.id}', true)">Genaktiver</button>`}
-        <button class="btn-edit" onclick="openEditModal('${b.id}')">✏️</button>
-        <button class="btn-delete" onclick="deleteListing('${b.id}')">Slet</button>
-      </div>
-    </div>`;
-  }).join('');
+  try {
+    grid.innerHTML = data.map(b => {
+      var isSold = !b.is_active;
+      var views  = b.views || 0;
+      return `<div class="my-listing-row" style="${isSold ? 'opacity:0.65' : ''}">
+        <div class="my-listing-info">
+          <div class="my-listing-title">${b.brand} ${b.model} ${isSold ? '<span style="background:var(--charcoal);color:#fff;font-size:.68rem;padding:2px 7px;border-radius:4px;vertical-align:middle;">SOLGT</span>' : ''}</div>
+          <div class="my-listing-meta">${b.type} · ${b.city} · ${b.condition}</div>
+          <div class="my-listing-views">👁 ${views.toLocaleString('da-DK')} visninger</div>
+        </div>
+        <div class="my-listing-price">${(b.price || 0).toLocaleString('da-DK')} kr.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${!isSold ? `<button class="btn-sold" onclick="toggleSold('${b.id}', false)">Sæt solgt</button>` : `<button class="btn-unsold" onclick="toggleSold('${b.id}', true)">Genaktiver</button>`}
+          <button class="btn-edit" onclick="openEditModal('${b.id}')">✏️</button>
+          <button class="btn-delete" onclick="deleteListing('${b.id}')">Slet</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (renderErr) {
+    console.error('Fejl ved rendering af mine annoncer:', renderErr);
+    grid.innerHTML = retryHTML('Kunne ikke vise annoncer.', 'loadMyListings');
+  }
 }
 
 async function deleteListing(id) {
@@ -1566,11 +1571,17 @@ async function saveCurrentSearch() {
 async function loadSavedSearches() {
   if (!currentUser) return;
   const list = document.getElementById('my-searches-list');
-  const { data, error } = await supabase
-    .from('saved_searches')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false });
+  let data, error;
+  try {
+    ({ data, error } = await supabase
+      .from('saved_searches')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false }));
+  } catch (e) {
+    list.innerHTML = retryHTML('Kunne ikke hente gemte søgninger.', 'loadSavedSearches');
+    return;
+  }
 
   if (error) { list.innerHTML = retryHTML('Kunne ikke hente gemte søgninger.', 'loadSavedSearches'); return; }
   if (!data || data.length === 0) {
@@ -1753,10 +1764,12 @@ async function openBikeModal(bikeId) {
     return;
   }
 
-  const profile    = b.profiles || {};
-  const sellerType = profile.seller_type || 'private';
-  const sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
-  const initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
+  let profile, sellerType, sellerName, initials;
+  try {
+  profile    = b.profiles || {};
+  sellerType = profile.seller_type || 'private';
+  sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
+  initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
 
   // Sorter billeder: primærbillede først
   const allImages = (b.bike_images || []).slice().sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
@@ -1834,7 +1847,7 @@ async function openBikeModal(bikeId) {
           ${b.city ? `<span class="detail-tag">📍 ${b.city}</span>` : ''}
           ${b.warranty ? `<span class="detail-tag" style="background:#e8f5e9;color:#2e7d32;">🛡️ ${b.warranty}</span>` : ''}
         </div>
-        ${b.description ? `<p style="font-size:0.85rem;color:var(--muted);margin:10px 0 0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${b.description}</p>` : ''}
+        ${b.description ? `<p style="font-size:0.85rem;color:var(--muted);margin:10px 0 0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(b.description)}</p>` : ''}
         <div class="bike-detail-seller" onclick="openUserProfile('${profile.id}')" style="cursor:pointer;" title="Se sælgers profil">
           <div class="seller-avatar-large">${initials}</div>
           <div style="flex:1">
@@ -1882,58 +1895,68 @@ async function openBikeModal(bikeId) {
 
   // Hent responstid for sælger (asynkront efter render)
   loadResponseTime(profile.id);
+
+  } catch (renderErr) {
+    console.error('Fejl ved rendering af annonce:', renderErr);
+    document.getElementById('bike-modal-body').innerHTML = retryHTML('Kunne ikke vise annonce.', `() => openBikeModal('${bikeId}')`);
+  }
 }
 
 async function loadResponseTime(sellerId) {
   const badge = document.getElementById('response-time-badge');
   if (!badge) return;
 
-  // Hent sælgers udgående beskeder (svar) og find gennemsnitlig responstid
-  const { data } = await supabase
-    .from('messages')
-    .select('created_at, bike_id, sender_id, receiver_id')
-    .eq('sender_id', sellerId)
-    .order('created_at', { ascending: true })
-    .limit(100);
+  try {
+    // Hent sælgers udgående beskeder (svar) og find gennemsnitlig responstid
+    const { data } = await supabase
+      .from('messages')
+      .select('created_at, bike_id, sender_id, receiver_id')
+      .eq('sender_id', sellerId)
+      .order('created_at', { ascending: true })
+      .limit(100);
 
-  if (!data || data.length < 3) {
-    badge.textContent = '';
-    return;
-  }
-
-  // Find tråde hvor sælger svarede på en indgående besked
-  const { data: received } = await supabase
-    .from('messages')
-    .select('created_at, bike_id, sender_id')
-    .eq('receiver_id', sellerId)
-    .order('created_at', { ascending: true })
-    .limit(100);
-
-  if (!received || received.length === 0) { badge.textContent = ''; return; }
-
-  // Beregn responstid per tråd
-  const responseTimes = [];
-  received.forEach(inMsg => {
-    const reply = data.find(outMsg =>
-      outMsg.bike_id === inMsg.bike_id &&
-      new Date(outMsg.created_at) > new Date(inMsg.created_at)
-    );
-    if (reply) {
-      const mins = (new Date(reply.created_at) - new Date(inMsg.created_at)) / 60000;
-      if (mins > 0 && mins < 60 * 24 * 7) responseTimes.push(mins); // max 1 uge
+    if (!data || data.length < 3) {
+      badge.textContent = '';
+      return;
     }
-  });
 
-  if (responseTimes.length < 2) { badge.textContent = ''; return; }
+    // Find tråde hvor sælger svarede på en indgående besked
+    const { data: received } = await supabase
+      .from('messages')
+      .select('created_at, bike_id, sender_id')
+      .eq('receiver_id', sellerId)
+      .order('created_at', { ascending: true })
+      .limit(100);
 
-  const avgMins = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
-  let label;
-  if (avgMins < 60)        label = `Svarer typisk inden for en time`;
-  else if (avgMins < 360)  label = `Svarer typisk inden for ${Math.round(avgMins / 60)} timer`;
-  else if (avgMins < 1440) label = `Svarer typisk samme dag`;
-  else                     label = `Svarer typisk inden for ${Math.round(avgMins / 1440)} dage`;
+    if (!received || received.length === 0) { badge.textContent = ''; return; }
 
-  badge.textContent = `⏱ ${label}`;
+    // Beregn responstid per tråd
+    const responseTimes = [];
+    received.forEach(inMsg => {
+      const reply = data.find(outMsg =>
+        outMsg.bike_id === inMsg.bike_id &&
+        new Date(outMsg.created_at) > new Date(inMsg.created_at)
+      );
+      if (reply) {
+        const mins = (new Date(reply.created_at) - new Date(inMsg.created_at)) / 60000;
+        if (mins > 0 && mins < 60 * 24 * 7) responseTimes.push(mins); // max 1 uge
+      }
+    });
+
+    if (responseTimes.length < 2) { badge.textContent = ''; return; }
+
+    const avgMins = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+    let label;
+    if (avgMins < 60)        label = `Svarer typisk inden for en time`;
+    else if (avgMins < 360)  label = `Svarer typisk inden for ${Math.round(avgMins / 60)} timer`;
+    else if (avgMins < 1440) label = `Svarer typisk samme dag`;
+    else                     label = `Svarer typisk inden for ${Math.round(avgMins / 1440)} dage`;
+
+    badge.textContent = `⏱ ${label}`;
+  } catch (e) {
+    console.error('Fejl ved loadResponseTime:', e);
+    badge.textContent = '';
+  }
 }
 
 /* ── Rapporter annonce ── */
@@ -3033,7 +3056,6 @@ window.loadInboxModal     = loadInboxModal;
 // Fang uventede promise-fejl globalt så siden ikke sidder fast
 window.addEventListener('unhandledrejection', event => {
   console.error('[Uhandteret fejl]', event.reason);
-  event.preventDefault();
 });
 
 init();
