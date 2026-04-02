@@ -758,6 +758,7 @@ async function openUserProfile(userId) {
           <span class="badge ${isDealer ? 'badge-dealer' : 'badge-private'}">${isDealer ? '🏪 Forhandler' : '👤 Privat sælger'}</span>
           ${memberYear ? `<span class="up-member-since">Medlem siden ${memberYear}</span>` : ''}
         </div>
+        <div class="up-achievements" id="user-achievements"></div>
         ${profile.bio ? `<p class="up-bio">${esc(profile.bio)}</p>` : ''}
       </div>
     </div>
@@ -804,6 +805,76 @@ async function openUserProfile(userId) {
     s.addEventListener('mouseout',  () => highlightStars(window._pickedStar || 0));
   });
   window._pickedStar = 0;
+
+  // Beregn og vis achievements asynkront
+  loadUserAchievements(userId, activeBikes, soldBikes, reviewList, profile);
+}
+
+async function loadUserAchievements(userId, activeBikes, soldBikes, reviewList, profile) {
+  const wrap = document.getElementById('user-achievements');
+  if (!wrap) return;
+  try {
+    const badges = [];
+    const numActive = (activeBikes || []).length;
+    const numSold   = (soldBikes || []).length;
+    const avgRating = reviewList.length ? (reviewList.reduce((s, r) => s + r.rating, 0) / reviewList.length) : 0;
+
+    // Uploader ofte: 3+ aktive annoncer
+    if (numActive >= 3) badges.push({ icon: '📦', label: 'Uploader ofte', title: '3+ aktive annoncer' });
+
+    // Erfaren sælger: 5+ solgte
+    if (numSold >= 5) badges.push({ icon: '🏆', label: 'Erfaren sælger', title: '5+ solgte cykler' });
+    else if (numSold >= 1) badges.push({ icon: '🤝', label: 'Har solgt', title: `${numSold} gennemført${numSold === 1 ? '' : 'e'} salg` });
+
+    // Top-rated: 4.5+ gennemsnit med mindst 3 vurderinger
+    if (reviewList.length >= 3 && avgRating >= 4.5) badges.push({ icon: '⭐', label: 'Topvurderet', title: `${avgRating.toFixed(1)} gns. fra ${reviewList.length} vurderinger` });
+
+    // Verificeret: ID-verificeret
+    if (profile.id_verified) badges.push({ icon: '🪪', label: 'ID-verificeret', title: 'Har verificeret sin identitet' });
+
+    // Veteranmedlem: 1+ år
+    if (profile.created_at) {
+      const ageMonths = (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (ageMonths >= 12) badges.push({ icon: '🎖️', label: 'Veteranmedlem', title: 'Medlem i 1+ år' });
+    }
+
+    // Svarer hurtigt: hent responstid
+    const { data: sent } = await supabase
+      .from('messages')
+      .select('created_at, bike_id')
+      .eq('sender_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const { data: received } = await supabase
+      .from('messages')
+      .select('created_at, bike_id')
+      .eq('receiver_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    if (sent && received && sent.length >= 3 && received.length >= 1) {
+      const responseTimes = [];
+      received.forEach(inMsg => {
+        const reply = sent.find(o => o.bike_id === inMsg.bike_id && new Date(o.created_at) > new Date(inMsg.created_at));
+        if (reply) {
+          const mins = (new Date(reply.created_at) - new Date(inMsg.created_at)) / 60000;
+          if (mins > 0 && mins < 10080) responseTimes.push(mins);
+        }
+      });
+      if (responseTimes.length >= 2) {
+        const avg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+        if (avg < 60) badges.push({ icon: '⚡', label: 'Svarer hurtigt', title: 'Svarer typisk inden for en time' });
+        else if (avg < 360) badges.push({ icon: '💬', label: 'Svarer samme dag', title: 'Svarer typisk inden for få timer' });
+      }
+    }
+
+    if (badges.length === 0) return;
+
+    wrap.innerHTML = badges.map(b =>
+      `<span class="achievement-badge" title="${esc(b.title)}">${b.icon} ${esc(b.label)}</span>`
+    ).join('');
+  } catch (e) {
+    console.error('loadUserAchievements fejl:', e);
+  }
 }
 
 function pickStar(val) {
@@ -897,10 +968,25 @@ async function loadBikes(filters = {}, append = false) {
     ? rawData.filter(b => b.profiles?.seller_type === filters.sellerType)
     : rawData;
 
+  // Hent favorit-tæller for alle viste bikes i én query
+  const bikeIds = data.map(b => b.id);
+  let saveCounts = {};
+  if (bikeIds.length > 0) {
+    const { data: countData } = await supabase
+      .from('saved_bikes')
+      .select('bike_id')
+      .in('bike_id', bikeIds);
+    if (countData) {
+      countData.forEach(row => {
+        saveCounts[row.bike_id] = (saveCounts[row.bike_id] || 0) + 1;
+      });
+    }
+  }
+
   if (append) {
-    renderBikes(data, true);
+    renderBikes(data, true, saveCounts);
   } else {
-    renderBikes(data);
+    renderBikes(data, false, saveCounts);
   }
 
   bikesOffset += data.length;
@@ -922,7 +1008,7 @@ async function loadBikes(filters = {}, append = false) {
   grid.after(footer);
 }
 
-function renderBikes(bikes, append = false) {
+function renderBikes(bikes, append = false, saveCounts = {}) {
   const grid = document.getElementById('listings-grid');
 
   if (!append && (!bikes || bikes.length === 0)) {
@@ -950,6 +1036,7 @@ function renderBikes(bikes, append = false) {
       : '<span style="font-size:4rem">🚲</span>';
 
     var isSold = !b.is_active;
+    var saveCount = saveCounts[b.id] || 0;
     return `
       <div class="bike-card" style="animation-delay:${(startIndex + i) * 50}ms;${isSold ? 'opacity:0.7' : ''}" onclick="${isSold ? '' : "openBikeModal('" + b.id + "')"}">
         <div class="bike-card-img">
@@ -957,6 +1044,7 @@ function renderBikes(bikes, append = false) {
           ${isSold ? '<div class="sold-tag"><span>SOLGT</span></div>' : ''}
           <span class="condition-tag">${b.condition}</span>
           ${b.warranty && !isSold ? '<span class="warranty-card-badge">🛡️ Garanti</span>' : ''}
+          ${saveCount > 0 ? `<span class="fav-count-badge">❤ ${saveCount}</span>` : ''}
           ${!isSold ? `<button class="save-btn" onclick="event.stopPropagation();toggleSave(this,'${b.id}')">🤍</button>` : ''}
         </div>
         <div class="bike-card-body">
@@ -1137,7 +1225,36 @@ function openModal() {
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
   enableFocusTrap('modal');
+
+  // Tilknyt prisforslag-listener til type-select
+  const modalEl = document.getElementById('modal');
+  const typeSelect = modalEl.querySelectorAll('select')[0];
+  if (typeSelect && !typeSelect._priceSuggestBound) {
+    typeSelect._priceSuggestBound = true;
+    typeSelect.addEventListener('change', () => updatePriceSuggestion(typeSelect.value));
+  }
 }
+
+async function updatePriceSuggestion(bikeType) {
+  const wrap = document.getElementById('price-suggestion');
+  if (!wrap || !bikeType) { if (wrap) wrap.style.display = 'none'; return; }
+
+  const { data } = await supabase
+    .from('bikes')
+    .select('price')
+    .eq('type', bikeType)
+    .eq('is_active', true)
+    .limit(50);
+
+  if (!data || data.length < 3) { wrap.style.display = 'none'; return; }
+
+  const prices = data.map(b => b.price).sort((a, b) => a - b);
+  const avg    = Math.round(prices.reduce((s, p) => s + p, 0) / prices.length);
+  const low    = prices[Math.floor(prices.length * 0.25)];
+  const high   = prices[Math.floor(prices.length * 0.75)];
+
+  wrap.innerHTML = `💡 Andre ${esc(bikeType).toLowerCase()}er sælges typisk for <strong>${low.toLocaleString('da-DK')}–${high.toLocaleString('da-DK')} kr.</strong> (gns. ${avg.toLocaleString('da-DK')} kr.)`;
+  wrap.style.display = 'block';
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
   document.body.style.overflow = '';
@@ -1394,13 +1511,14 @@ function showProfileData() {
 }
 
 function switchProfileTab(tab) {
-  ['info', 'listings', 'saved', 'searches', 'inbox'].forEach(t => {
+  ['info', 'listings', 'saved', 'searches', 'trades', 'inbox'].forEach(t => {
     document.getElementById(`profile-${t}`).style.display = t === tab ? 'block' : 'none';
     document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
   });
   if (tab === 'listings') loadMyListings();
   if (tab === 'saved')    loadSavedListings();
   if (tab === 'searches') loadSavedSearches();
+  if (tab === 'trades')   loadTradeHistory();
   if (tab === 'inbox')    loadInbox();
 }
 
@@ -1663,6 +1781,80 @@ async function deleteSavedSearch(id, btn) {
   const list = document.getElementById('my-searches-list');
   if (list && !list.querySelector('.my-listing-row')) {
     list.innerHTML = `<p style="color:var(--muted)">Ingen gemte søgninger endnu.</p>`;
+  }
+}
+
+/* ============================================================
+   HANDELSHISTORIK
+   ============================================================ */
+
+async function loadTradeHistory() {
+  if (!currentUser) return;
+  const list = document.getElementById('trade-history-list');
+
+  try {
+    // Find alle beskeder med "accepteret" der involverer den aktuelle bruger
+    const { data: tradeMessages, error } = await supabase
+      .from('messages')
+      .select('id, bike_id, sender_id, receiver_id, content, created_at')
+      .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+      .ilike('content', '%accepteret%')
+      .order('created_at', { ascending: false });
+
+    if (error) { list.innerHTML = retryHTML('Kunne ikke hente handelshistorik.', 'loadTradeHistory'); return; }
+    if (!tradeMessages || tradeMessages.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted)">Ingen gennemførte handler endnu.</p>';
+      return;
+    }
+
+    // Dedupliker pr. bike_id (kun nyeste trade-besked pr. cykel)
+    const seen = new Set();
+    const uniqueTrades = tradeMessages.filter(m => {
+      if (seen.has(m.bike_id)) return false;
+      seen.add(m.bike_id);
+      return true;
+    });
+
+    // Hent bike-info og modparts profil
+    const bikeIds  = uniqueTrades.map(m => m.bike_id);
+    const otherIds = uniqueTrades.map(m => m.sender_id === currentUser.id ? m.receiver_id : m.sender_id);
+
+    const [bikesRes, profilesRes] = await Promise.all([
+      supabase.from('bikes').select('id, brand, model, price, type, bike_images(url, is_primary)').in('id', bikeIds),
+      supabase.from('profiles').select('id, name, shop_name, seller_type').in('id', [...new Set(otherIds)]),
+    ]);
+
+    const bikesMap    = {};
+    const profilesMap = {};
+    (bikesRes.data || []).forEach(b => bikesMap[b.id] = b);
+    (profilesRes.data || []).forEach(p => profilesMap[p.id] = p);
+
+    list.innerHTML = uniqueTrades.map(trade => {
+      const bike     = bikesMap[trade.bike_id] || {};
+      const otherId  = trade.sender_id === currentUser.id ? trade.receiver_id : trade.sender_id;
+      const other    = profilesMap[otherId] || {};
+      const otherName = other.seller_type === 'dealer' ? other.shop_name : other.name;
+      const isSeller  = trade.sender_id === currentUser.id;
+      const date       = new Date(trade.created_at).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' });
+      const img        = bike.bike_images?.find(i => i.is_primary)?.url || bike.bike_images?.[0]?.url;
+
+      return `
+        <div class="trade-row">
+          <div class="trade-img" onclick="openBikeModal('${trade.bike_id}')">
+            ${img ? `<img src="${img}" alt="" loading="lazy">` : '<span style="font-size:1.5rem">🚲</span>'}
+          </div>
+          <div class="trade-info">
+            <div class="trade-title">${esc(bike.brand || '')} ${esc(bike.model || '')}</div>
+            <div class="trade-meta">${isSeller ? 'Solgt til' : 'Købt fra'} <strong onclick="openUserProfile('${otherId}')" style="cursor:pointer;color:var(--rust);">${esc(otherName || 'Ukendt')}</strong></div>
+            <div class="trade-date">${date}</div>
+          </div>
+          <div class="trade-price">${bike.price ? bike.price.toLocaleString('da-DK') + ' kr.' : ''}</div>
+          <span class="trade-status">✅ Gennemført</span>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    console.error('loadTradeHistory fejl:', e);
+    list.innerHTML = retryHTML('Kunne ikke hente handelshistorik.', 'loadTradeHistory');
   }
 }
 
@@ -3122,6 +3314,7 @@ window.removeSaved       = removeSaved;
 window.saveCurrentSearch  = saveCurrentSearch;
 window.applySavedSearch   = applySavedSearch;
 window.deleteSavedSearch  = deleteSavedSearch;
+window.loadTradeHistory   = loadTradeHistory;
 window.showSection       = showSection;
 window.logout                  = logout;
 window.resendConfirmationEmail = resendConfirmationEmail;

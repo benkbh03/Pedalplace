@@ -401,6 +401,53 @@ nav {
 .up-badges { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .up-member-since { color: var(--muted); font-size: 0.78rem; }
 
+/* Achievements */
+.up-achievements { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.achievement-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 0.75rem; font-weight: 600;
+  background: var(--sand); border: 1px solid var(--border);
+  color: var(--charcoal); cursor: default;
+}
+
+/* Favorit-tæller badge */
+.fav-count-badge {
+  position: absolute; bottom: 8px; left: 8px;
+  background: rgba(0,0,0,0.65); color: #fff;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Prisforslag */
+.price-suggestion {
+  margin-top: 6px; padding: 8px 12px;
+  background: #e8f5e9; border-radius: 8px;
+  font-size: 0.82rem; color: #2e7d32; line-height: 1.5;
+}
+
+/* Handelshistorik */
+.trade-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: 10px;
+  border: 1px solid var(--border); margin-bottom: 10px;
+  background: var(--sand);
+}
+.trade-img {
+  width: 52px; height: 52px; border-radius: 8px;
+  overflow: hidden; background: #eee; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.trade-img img { width: 100%; height: 100%; object-fit: cover; }
+.trade-info { flex: 1; min-width: 0; }
+.trade-title { font-weight: 600; font-size: 0.9rem; color: var(--charcoal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trade-meta { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+.trade-date { font-size: 0.75rem; color: var(--muted); }
+.trade-price { font-weight: 700; font-size: 0.9rem; color: var(--charcoal); white-space: nowrap; }
+.trade-status { font-size: 0.75rem; color: #2e7d32; font-weight: 600; white-space: nowrap; }
+
 .up-stats {
   display: flex; gap: 0; border: 1px solid rgba(245,240,232,0.12);
   border-radius: 10px; overflow: hidden; margin-bottom: 28px;

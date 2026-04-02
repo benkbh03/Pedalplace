@@ -434,7 +434,7 @@
             <label>Hjulstørrelse</label>
             <select id="modal-wheel-size"><option value="">Vælg</option><option>26"</option><option>27.5" / 650b</option><option>28"</option><option>29"</option></select>
           </div>
-          <div class="form-group"><label>Pris (kr.) *</label><input type="number" placeholder="f.eks. 4500"></div>
+          <div class="form-group"><label>Pris (kr.) *</label><input type="number" placeholder="f.eks. 4500"><div id="price-suggestion" class="price-suggestion" style="display:none;"></div></div>
           <div class="form-group"><label>Årstal</label><input type="number" placeholder="f.eks. 2021"></div>
           <div class="form-group">
             <label>Stand *</label>
@@ -532,6 +532,7 @@
           <button class="profile-tab" id="ptab-listings" onclick="switchProfileTab('listings')">Mine annoncer</button>
           <button class="profile-tab" id="ptab-saved" onclick="switchProfileTab('saved')">Gemte</button>
           <button class="profile-tab" id="ptab-searches" onclick="switchProfileTab('searches')">Søgninger</button>
+          <button class="profile-tab" id="ptab-trades" onclick="switchProfileTab('trades')">Handler</button>
           <button class="profile-tab" id="ptab-inbox" onclick="switchProfileTab('inbox')">Indbakke <span id="inbox-badge" class="inbox-badge" style="display:none"></span></button>
         </div>
 
@@ -636,6 +637,13 @@
         <div id="profile-searches" style="display:none;">
           <div id="my-searches-list">
             <p style="color:var(--muted)">Indlæser gemte søgninger...</p>
+          </div>
+        </div>
+
+        <!-- Handelshistorik -->
+        <div id="profile-trades" style="display:none;">
+          <div id="trade-history-list">
+            <p style="color:var(--muted)">Indlæser handelshistorik...</p>
           </div>
         </div>
 
