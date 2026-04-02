@@ -1752,7 +1752,7 @@ async function openBikeModal(bikeId) {
 
   // Tæl visning (fire-and-forget, kun ikke-ejere)
   if (b && (!currentUser || currentUser.id !== b.user_id)) {
-    supabase.rpc('increment_bike_views', { bike_id: bikeId }).catch(() => {});
+    supabase.rpc('increment_bike_views', { bike_id: bikeId }).then(null, () => {});
   }
 
   if (error || !b) {
