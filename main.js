@@ -785,15 +785,15 @@ async function openUserProfile(userId) {
 
     <!-- Statistik -->
     <div class="up-stats">
-      <div class="up-stat up-stat-clickable" onclick="switchProfileTab('listings')">
+      <div class="up-stat up-stat-clickable" onclick="switchUserProfileTab('listings')">
         <div class="up-stat-val">${nActive}</div>
         <div class="up-stat-label">Til salg</div>
       </div>
-      <div class="up-stat up-stat-clickable" onclick="switchProfileTab('sold')">
+      <div class="up-stat up-stat-clickable" onclick="switchUserProfileTab('sold')">
         <div class="up-stat-val">${nSold}</div>
         <div class="up-stat-label">Solgt</div>
       </div>
-      <div class="up-stat up-stat-clickable" onclick="switchProfileTab('reviews')">
+      <div class="up-stat up-stat-clickable" onclick="switchUserProfileTab('reviews')">
         <div class="up-stat-val">${avgRating !== null ? avgRating.toFixed(1) + ' ★' : '–'}</div>
         <div class="up-stat-label">${nReviews} ${nReviews === 1 ? 'vurdering' : 'vurderinger'}</div>
       </div>
@@ -801,9 +801,9 @@ async function openUserProfile(userId) {
 
     <!-- Tabs -->
     <div class="up-tabs">
-      <button class="up-tab active" data-tab="listings" onclick="switchProfileTab('listings')">Til salg (${nActive})</button>
-      <button class="up-tab" data-tab="sold" onclick="switchProfileTab('sold')">Solgt (${nSold})</button>
-      <button class="up-tab" data-tab="reviews" onclick="switchProfileTab('reviews')">Vurderinger${avgRating !== null ? ` ${avgRating.toFixed(1)} ★` : ` (${nReviews})`}</button>
+      <button class="up-tab active" data-tab="listings" onclick="switchUserProfileTab('listings')">Til salg (${nActive})</button>
+      <button class="up-tab" data-tab="sold" onclick="switchUserProfileTab('sold')">Solgt (${nSold})</button>
+      <button class="up-tab" data-tab="reviews" onclick="switchUserProfileTab('reviews')">Vurderinger${avgRating !== null ? ` ${avgRating.toFixed(1)} ★` : ` (${nReviews})`}</button>
     </div>
 
     <!-- Tab: Til salg -->
@@ -834,7 +834,7 @@ async function openUserProfile(userId) {
   loadUserAchievements(userId, activeBikes, soldBikes, reviewList, profile);
 }
 
-function switchProfileTab(tab) {
+function switchUserProfileTab(tab) {
   document.querySelectorAll('.up-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.up-tab-panel').forEach(p => p.style.display = 'none');
   const panel = document.getElementById('up-tab-' + tab);
@@ -3378,7 +3378,8 @@ window.handleRegister    = handleRegister;
 window.handleForgotPassword = handleForgotPassword;
 window.openProfileModal  = openProfileModal;
 window.closeProfileModal = closeProfileModal;
-window.switchProfileTab  = switchProfileTab;
+window.switchProfileTab     = switchProfileTab;
+window.switchUserProfileTab = switchUserProfileTab;
 window.saveProfile          = saveProfile;
 window.onSellerTypeChange   = onSellerTypeChange;
 window.uploadAvatar      = uploadAvatar;
