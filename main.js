@@ -57,6 +57,18 @@ function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// Hjælper: wrapper der tilføjer timeout til Supabase queries
+// Forhindrer at modaler hænger i "Henter..." for evigt hvis en query aldrig resolver
+function queryWithTimeout(promise, ms) {
+  if (!ms) ms = 12000;
+  return Promise.race([
+    promise,
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('Query timeout efter ' + ms + 'ms')); }, ms);
+    })
+  ]);
+}
+
 // Hjælper: focus trap — returnerer cleanup-funktion
 function trapFocus(modalEl) {
   const focusable = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -137,32 +149,37 @@ async function init() {
   }
 
   // Opdater nav når bruger logger ind/ud
+  // _hasHadSession forhindrer at token-refresh (der fyrer SIGNED_IN) kalder loadBikes() unødvendigt
+  let _hasHadSession = !!currentUser;
   supabase.auth.onAuthStateChange(async (_event, session) => {
-    console.log(`[IDLE-DEBUG] onAuthStateChange: event=${_event}, hasSession=${!!session}`);
+    console.log(`[IDLE-DEBUG] onAuthStateChange: event=${_event}, hasSession=${!!session}, _hasHadSession=${_hasHadSession}`);
     if (session) {
+      const isNewLogin = !_hasHadSession;
+      _hasHadSession = true;
       currentUser = session.user;
-      console.log(`[IDLE-DEBUG] onAuthStateChange: currentUser.id=${currentUser.id}`);
+      console.log(`[IDLE-DEBUG] onAuthStateChange: currentUser.id=${currentUser.id}, isNewLogin=${isNewLogin}`);
       const { data: profile, error: profileErr } = await supabase
         .from('profiles').select('*').eq('id', currentUser.id).single();
-      console.log(`[IDLE-DEBUG] onAuthStateChange profile fetch: ${profileErr ? 'FAIL' : 'OK'}, profileErr=${profileErr?.message || 'none'}`);
+      if (profileErr) console.warn('[IDLE-DEBUG] onAuthStateChange profile fetch FAIL:', profileErr.message);
       currentProfile = profile;
       updateNav(true, profile?.name, profile?.avatar_url);
       var adminBtn = document.getElementById('nav-admin');
       if (adminBtn) adminBtn.style.display = profile?.is_admin ? 'flex' : 'none';
       checkEmailConfirmed();
-      // Nyt login — opdater annoncerne (TOKEN_REFRESHED håndteres af visibilitychange)
-      if (_event === 'SIGNED_IN') {
-        console.log(`[IDLE-DEBUG] onAuthStateChange: SIGNED_IN detected, calling loadBikes()`);
+      // Kun reload annoncer ved ægte nyt login — IKKE ved token-refresh der fyrer SIGNED_IN
+      if (_event === 'SIGNED_IN' && isNewLogin) {
+        console.log(`[IDLE-DEBUG] onAuthStateChange: genuine SIGNED_IN, calling loadBikes()`);
         loadBikes();
+      } else if (_event === 'SIGNED_IN') {
+        console.log(`[IDLE-DEBUG] onAuthStateChange: SIGNED_IN from token-refresh, SKIPPING loadBikes()`);
       }
     } else {
-      console.log(`[IDLE-DEBUG] onAuthStateChange: no session, clearing currentUser/currentProfile`);
+      _hasHadSession = false;
       currentUser    = null;
       currentProfile = null;
       updateNav(false);
       // Session udløbet — reload siden for at rydde stale state
       if (_event === 'SIGNED_OUT') {
-        console.log(`[IDLE-DEBUG] onAuthStateChange: SIGNED_OUT detected, reloading page`);
         window.location.href = window.location.pathname;
       }
     }
@@ -172,21 +189,16 @@ async function init() {
   // Debounce: forhindrer spam ved hurtig tab-switch
   let _visibilityTimeout = null;
   document.addEventListener('visibilitychange', async () => {
-    console.log(`[IDLE-DEBUG] visibilitychange: state=${document.visibilityState}`);
     if (document.visibilityState !== 'visible') return;
     clearTimeout(_visibilityTimeout);
     _visibilityTimeout = setTimeout(async () => {
       console.log(`[IDLE-DEBUG] visibilitychange (500ms debounce): triggering session refresh + loadBikes()`);
-      console.log(`[IDLE-DEBUG] visibilitychange: currentUser.id=${currentUser?.id || 'none'}, currentProfile.id=${currentProfile?.id || 'none'}`);
       const { data, error } = await supabase.auth.getSession();
-      console.log(`[IDLE-DEBUG] visibilitychange: getSession() ${error ? 'FAIL' : 'OK'}, error=${error?.message || 'none'}`);
       loadBikes();
       // Opdater last_seen når brugeren vender tilbage til fanen
       if (currentUser) {
         supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id).then(() => {
-          console.log(`[IDLE-DEBUG] visibilitychange: last_seen updated for user ${currentUser.id}`);
         }, (err) => {
-          console.log(`[IDLE-DEBUG] visibilitychange: last_seen update FAILED: ${err?.message}`);
         });
       }
       // updateFilterCounts opdateres kun ved initial load og efter mutationer
@@ -501,25 +513,27 @@ async function openDealerProfile(dealerId) {
   const bikesGrid = document.getElementById('dealer-profile-bikes');
   if (!modal) return;
 
-  console.log(`[IDLE-DEBUG] openDealerProfile: setting loading HTML`);
   header.innerHTML = '<p style="color:var(--muted);padding:20px 0">Henter forhandler...</p>';
   bikesGrid.innerHTML = '';
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
   // Hent forhandlerens profil
-  console.log(`[IDLE-DEBUG] openDealerProfile: fetching dealer profile for dealerId=${dealerId}`);
-  const { data: dealer, error: dealerErr } = await supabase
-    .from('profiles')
-    .select('id, shop_name, name, city, verified, avatar_url')
-    .eq('id', dealerId)
-    .single();
-
-  console.log(`[IDLE-DEBUG] openDealerProfile: dealer profile fetch ${dealerErr ? 'FAIL' : 'OK'}, dealer=${dealer ? dealer.shop_name || dealer.name : 'null'}, error=${dealerErr?.message || 'none'}`);
+  let dealer, dealerErr;
+  try {
+    ({ data: dealer, error: dealerErr } = await queryWithTimeout(supabase
+      .from('profiles')
+      .select('id, shop_name, name, city, verified, avatar_url')
+      .eq('id', dealerId)
+      .single()));
+  } catch (e) {
+    dealerErr = e;
+    console.error(`[IDLE-DEBUG] openDealerProfile: dealer fetch EXCEPTION/TIMEOUT: ${e.message}`);
+  }
 
   if (!dealer) {
-    console.log(`[IDLE-DEBUG] openDealerProfile: dealer is null, setting error HTML`);
-    header.innerHTML = '<p style="color:var(--rust)">Kunne ikke hente forhandler.</p>';
+    console.log(`[IDLE-DEBUG] openDealerProfile: setting error HTML`);
+    header.innerHTML = retryHTML('Kunne ikke hente forhandler.', `() => openDealerProfile('${dealerId}')`);
     return;
   }
 
@@ -532,7 +546,6 @@ async function openDealerProfile(dealerId) {
     ? `<img src="${dealer.avatar_url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
     : initials;
 
-  console.log(`[IDLE-DEBUG] openDealerProfile: rendering header for ${displayName}`);
   header.innerHTML = `
     <div class="dealer-profile-hero">
       <div class="dealer-profile-logo">${dealerLogoContent}</div>
@@ -550,18 +563,20 @@ async function openDealerProfile(dealerId) {
   `;
 
   // Hent forhandlerens cykler
-  console.log(`[IDLE-DEBUG] openDealerProfile: fetching bikes for dealerId=${dealerId}`);
-  const { data: bikes, error: bikesErr } = await supabase
-    .from('bikes')
-    .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
-    .eq('user_id', dealerId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
-
-  console.log(`[IDLE-DEBUG] openDealerProfile: bikes fetch ${bikesErr ? 'FAIL' : 'OK'}, bikes.length=${bikes?.length || 0}, error=${bikesErr?.message || 'none'}`);
+  let bikes, bikesErr;
+  try {
+    ({ data: bikes, error: bikesErr } = await queryWithTimeout(supabase
+      .from('bikes')
+      .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
+      .eq('user_id', dealerId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })));
+  } catch (e) {
+    bikesErr = e;
+    console.error(`[IDLE-DEBUG] openDealerProfile: bikes fetch EXCEPTION/TIMEOUT: ${e.message}`);
+  }
 
   if (!bikes || bikes.length === 0) {
-    console.log(`[IDLE-DEBUG] openDealerProfile: no bikes found, setting empty state`);
     bikesGrid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);">
         <div style="font-size:3rem;margin-bottom:12px;">🚲</div>
@@ -639,7 +654,6 @@ async function openUserProfile(userId) {
   const modal   = document.getElementById('user-profile-modal');
   const content = document.getElementById('user-profile-content');
   if (!modal || !content) { console.error('user-profile-modal eller user-profile-content ikke fundet i DOM'); return; }
-  console.log(`[IDLE-DEBUG] openUserProfile: DOM elements found, setting loading HTML`);
   content.innerHTML = '<p style="color:var(--muted);padding:60px 0;text-align:center;">Henter profil...</p>';
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -649,28 +663,20 @@ async function openUserProfile(userId) {
   try {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
-    console.log(`[IDLE-DEBUG] openUserProfile: starting Promise.all() for 4 queries`);
-    const [r1, r2, r3, r4] = await Promise.all([
+    const [r1, r2, r3, r4] = await queryWithTimeout(Promise.all([
       safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url, last_seen, bio').eq('id', userId).single()),
       safe(supabase.from('bikes').select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
-    ]);
+    ]));
 
-    console.log(`[IDLE-DEBUG] openUserProfile: Promise.all() done - r1=${r1.error ? 'FAIL' : 'OK'}, r2=${r2.error ? 'FAIL' : 'OK'}, r3=${r3.error ? 'FAIL' : 'OK'}, r4=${r4.error ? 'FAIL' : 'OK'}`);
     profile     = r1.data;
     activeBikes = r2.data;
     soldBikes   = r3.data;
     reviews     = r4.error ? [] : (r4.data || []);
 
-    if (r1.error) console.warn(`[IDLE-DEBUG] openUserProfile: r1 (profiles) error: ${r1.error.message}`);
-    if (r2.error) console.warn(`[IDLE-DEBUG] openUserProfile: r2 (active bikes) error: ${r2.error.message}`);
-    if (r3.error) console.warn(`[IDLE-DEBUG] openUserProfile: r3 (sold bikes) error: ${r3.error.message}`);
-    if (r4.error) console.warn(`[IDLE-DEBUG] openUserProfile: r4 (reviews) error: ${r4.error.message}`);
-
     if (currentUser) {
       // hasTraded = der findes en budaccepterings-besked mellem de to brugere
-      console.log(`[IDLE-DEBUG] openUserProfile: fetching messages between ${currentUser.id} and ${userId}`);
       const { data: tradeMsg, error: msgErr } = await safe(
         supabase.from('messages')
           .select('id')
@@ -678,10 +684,8 @@ async function openUserProfile(userId) {
           .ilike('content', '%accepteret%')
           .limit(1)
       );
-      console.log(`[IDLE-DEBUG] openUserProfile: messages fetch ${msgErr ? 'FAIL' : 'OK'}, tradeMsg.length=${tradeMsg?.length || 0}`);
       messagesCount = tradeMsg?.length || 0;
     } else {
-      console.log(`[IDLE-DEBUG] openUserProfile: no currentUser, skipping messages check`);
       messagesCount = 0;
     }
   } catch (err) {
@@ -692,12 +696,9 @@ async function openUserProfile(userId) {
   }
 
   if (!profile) {
-    console.log(`[IDLE-DEBUG] openUserProfile: profile is null/undefined, setting "kunne ikke hente" HTML`);
     content.innerHTML = '<p style="color:var(--rust);padding:40px;text-align:center;">Kunne ikke hente profil.</p>';
     return;
   }
-
-  console.log(`[IDLE-DEBUG] openUserProfile: rendering profile content, activeBikes=${activeBikes?.length || 0}, soldBikes=${soldBikes?.length || 0}, reviews=${reviews?.length || 0}`);
 
   const displayName  = profile.seller_type === 'dealer' ? (profile.shop_name || profile.name) : profile.name;
   const initials     = (displayName || 'U').substring(0, 2).toUpperCase();
@@ -2074,28 +2075,23 @@ async function openBikeModal(bikeId) {
   closeAllModals();
   document.getElementById('bike-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
-  console.log(`[IDLE-DEBUG] openBikeModal: setting loading HTML`);
   document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
 
   let b, error;
   try {
-    console.log(`[IDLE-DEBUG] openBikeModal: fetching bike data for bikeId=${bikeId}`);
-    ({ data: b, error } = await supabase
+    ({ data: b, error } = await queryWithTimeout(supabase
       .from('bikes')
       .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
       .eq('id', bikeId)
-      .single());
-    console.log(`[IDLE-DEBUG] openBikeModal: bike fetch ${error ? 'FAIL' : 'OK'}, bike=${b ? b.brand + ' ' + b.model : 'null'}, error=${error?.message || 'none'}`);
+      .single()));
   } catch (e) {
     error = e;
-    console.log(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION: ${e.message}`);
+    console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION: ${e.message}`);
   }
 
   // Tæl visning (fire-and-forget, kun ikke-ejere)
   if (b && (!currentUser || currentUser.id !== b.user_id)) {
-    console.log(`[IDLE-DEBUG] openBikeModal: incrementing views for bikeId=${bikeId}`);
     supabase.rpc('increment_bike_views', { bike_id: bikeId }).then(null, (err) => {
-      console.log(`[IDLE-DEBUG] openBikeModal: increment_bike_views failed: ${err?.message || 'unknown'}`);
     });
   }
 
@@ -2177,7 +2173,6 @@ async function openBikeModal(bikeId) {
     _setMeta('og:description', 'Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce.');
   };
 
-  console.log(`[IDLE-DEBUG] openBikeModal: rendering main bike content`);
   document.getElementById('bike-modal-body').innerHTML = `
     <div class="bike-detail-grid">
       <div>
@@ -2246,7 +2241,6 @@ async function openBikeModal(bikeId) {
   attachGallerySwipe();
 
   // Hent responstid, sælgers andre annoncer og lignende (asynkront efter render)
-  console.log(`[IDLE-DEBUG] openBikeModal: calling loadResponseTime, loadSellerOtherListings, loadSimilarListings`);
   loadResponseTime(profile.id);
   loadSellerOtherListings(profile.id, b.id);
   loadSimilarListings(b.type, b.id);
@@ -2259,16 +2253,13 @@ async function openBikeModal(bikeId) {
 }
 
 async function loadResponseTime(sellerId) {
-  console.log(`[IDLE-DEBUG] loadResponseTime START: sellerId=${sellerId}`);
   const badge = document.getElementById('response-time-badge');
   if (!badge) {
-    console.log(`[IDLE-DEBUG] loadResponseTime: response-time-badge element not found`);
     return;
   }
 
   try {
     // Hent sælgers udgående beskeder (svar) og find gennemsnitlig responstid
-    console.log(`[IDLE-DEBUG] loadResponseTime: fetching outgoing messages for sellerId=${sellerId}`);
     const { data, error: outErr } = await supabase
       .from('messages')
       .select('created_at, bike_id, sender_id, receiver_id')
@@ -2276,16 +2267,13 @@ async function loadResponseTime(sellerId) {
       .order('created_at', { ascending: true })
       .limit(100);
 
-    console.log(`[IDLE-DEBUG] loadResponseTime: outgoing messages fetch ${outErr ? 'FAIL' : 'OK'}, data.length=${data?.length || 0}, error=${outErr?.message || 'none'}`);
 
     if (!data || data.length < 3) {
-      console.log(`[IDLE-DEBUG] loadResponseTime: insufficient data (< 3), clearing badge`);
       badge.textContent = '';
       return;
     }
 
     // Find tråde hvor sælger svarede på en indgående besked
-    console.log(`[IDLE-DEBUG] loadResponseTime: fetching incoming messages for sellerId=${sellerId}`);
     const { data: received, error: inErr } = await supabase
       .from('messages')
       .select('created_at, bike_id, sender_id')
@@ -2293,10 +2281,8 @@ async function loadResponseTime(sellerId) {
       .order('created_at', { ascending: true })
       .limit(100);
 
-    console.log(`[IDLE-DEBUG] loadResponseTime: incoming messages fetch ${inErr ? 'FAIL' : 'OK'}, received.length=${received?.length || 0}, error=${inErr?.message || 'none'}`);
 
     if (!received || received.length === 0) {
-      console.log(`[IDLE-DEBUG] loadResponseTime: no incoming messages, clearing badge`);
       badge.textContent = '';
       return;
     }
@@ -2315,7 +2301,6 @@ async function loadResponseTime(sellerId) {
     });
 
     if (responseTimes.length < 2) {
-      console.log(`[IDLE-DEBUG] loadResponseTime: insufficient response times (${responseTimes.length}), clearing badge`);
       badge.textContent = '';
       return;
     }
@@ -2327,7 +2312,6 @@ async function loadResponseTime(sellerId) {
     else if (avgMins < 1440) label = `Svarer typisk samme dag`;
     else                     label = `Svarer typisk inden for ${Math.round(avgMins / 1440)} dage`;
 
-    console.log(`[IDLE-DEBUG] loadResponseTime: SUCCESS, avgMins=${avgMins.toFixed(0)}, label="${label}"`);
     badge.textContent = `⏱ ${label}`;
   } catch (e) {
     console.error(`[IDLE-DEBUG] loadResponseTime EXCEPTION: ${e.message}`);
@@ -2338,15 +2322,12 @@ async function loadResponseTime(sellerId) {
 /* ── Sælgerens andre annoncer ── */
 
 async function loadSellerOtherListings(sellerId, currentBikeId) {
-  console.log(`[IDLE-DEBUG] loadSellerOtherListings START: sellerId=${sellerId}, currentBikeId=${currentBikeId}`);
   const wrap = document.getElementById('seller-other-listings');
   if (!wrap || !sellerId) {
-    console.log(`[IDLE-DEBUG] loadSellerOtherListings: wrap or sellerId missing, returning`);
     return;
   }
 
   try {
-    console.log(`[IDLE-DEBUG] loadSellerOtherListings: fetching other bikes for sellerId=${sellerId}`);
     const { data, error: queryErr } = await supabase
       .from('bikes')
       .select('id, brand, model, price, type, condition, bike_images(url, is_primary)')
@@ -2356,10 +2337,8 @@ async function loadSellerOtherListings(sellerId, currentBikeId) {
       .order('created_at', { ascending: false })
       .limit(6);
 
-    console.log(`[IDLE-DEBUG] loadSellerOtherListings: query ${queryErr ? 'FAIL' : 'OK'}, data.length=${data?.length || 0}, error=${queryErr?.message || 'none'}`);
 
     if (!data || data.length === 0) {
-      console.log(`[IDLE-DEBUG] loadSellerOtherListings: no other listings found`);
       return;
     } // Ingen andre annoncer — skjul sektionen
 
@@ -2378,7 +2357,6 @@ async function loadSellerOtherListings(sellerId, currentBikeId) {
         </div>`;
     }).join('');
 
-    console.log(`[IDLE-DEBUG] loadSellerOtherListings: SUCCESS, rendered ${data.length} listings`);
     wrap.innerHTML = `
       <h3 class="related-section-title">Sælgerens andre annoncer</h3>
       <div class="related-grid">${cards}</div>`;
@@ -2391,15 +2369,12 @@ async function loadSellerOtherListings(sellerId, currentBikeId) {
 /* ── Lignende annoncer ── */
 
 async function loadSimilarListings(bikeType, currentBikeId) {
-  console.log(`[IDLE-DEBUG] loadSimilarListings START: bikeType=${bikeType}, currentBikeId=${currentBikeId}`);
   const wrap = document.getElementById('similar-listings');
   if (!wrap || !bikeType) {
-    console.log(`[IDLE-DEBUG] loadSimilarListings: wrap or bikeType missing, returning`);
     return;
   }
 
   try {
-    console.log(`[IDLE-DEBUG] loadSimilarListings: fetching similar bikes for type=${bikeType}`);
     const { data, error: queryErr } = await supabase
       .from('bikes')
       .select('id, brand, model, price, type, condition, bike_images(url, is_primary)')
@@ -2409,10 +2384,8 @@ async function loadSimilarListings(bikeType, currentBikeId) {
       .order('created_at', { ascending: false })
       .limit(8);
 
-    console.log(`[IDLE-DEBUG] loadSimilarListings: query ${queryErr ? 'FAIL' : 'OK'}, data.length=${data?.length || 0}, error=${queryErr?.message || 'none'}`);
 
     if (!data || data.length === 0) {
-      console.log(`[IDLE-DEBUG] loadSimilarListings: no similar listings found`);
       return;
     }
 
@@ -2431,7 +2404,6 @@ async function loadSimilarListings(bikeType, currentBikeId) {
         </div>`;
     }).join('');
 
-    console.log(`[IDLE-DEBUG] loadSimilarListings: SUCCESS, rendered ${data.length} similar listings`);
     wrap.innerHTML = `
       <h3 class="related-section-title">Lignende annoncer</h3>
       <div class="related-grid">${cards}</div>`;
