@@ -1648,3 +1648,9 @@ footer p { color: var(--muted); font-size: 0.82rem; }
   transition: transform 0.15s;
 }
 .admin-id-img:hover { transform: scale(1.05); }
+
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

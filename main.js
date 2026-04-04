@@ -16,6 +16,9 @@ let currentProfile = null;
 // Brugerens gemte bike-IDs — opdateres ved loadBikes og toggleSave
 let _userSavedSet = new Set();
 
+// In-memory cache til bike-data — forhindrer dobbelt-fetch ved tilbage-navigation
+const bikeCache = new Map();
+
 // Stale-request guards: hvert modal-open incrementerer sit token.
 // Async responses tjekker om tokenet stadig matcher — ellers ignoreres response.
 let _bikeModalToken = 0;
@@ -2141,6 +2144,9 @@ function showSection(section) {
    ============================================================ */
 
 async function fetchBikeById(bikeId) {
+  if (bikeCache.has(bikeId)) {
+    return { data: bikeCache.get(bikeId), error: null };
+  }
   const fetchPromise = supabase
     .from('bikes')
     .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
@@ -2148,7 +2154,11 @@ async function fetchBikeById(bikeId) {
     .single();
   const timeoutPromise = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Timeout: annonceforespørgsel tog for lang tid')), 15000));
-  return Promise.race([fetchPromise, timeoutPromise]);
+  const result = await Promise.race([fetchPromise, timeoutPromise]);
+  if (result.data && !result.error) {
+    bikeCache.set(bikeId, result.data);
+  }
+  return result;
 }
 
 function buildBikeBodyHTML(b) {
@@ -2336,6 +2346,31 @@ async function openBikeModal(bikeId) {
    ANNONCE DETALJE PAGE (hash routing)
    ============================================================ */
 
+function renderBikeSkeleton() {
+  const s = 'background:linear-gradient(90deg,#e8e3d9 25%,#f0ebe3 50%,#e8e3d9 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s infinite;border-radius:6px;';
+  return `
+    <div style="max-width:1000px;margin:0 auto;padding:20px 16px;">
+      <div style="${s}height:34px;width:90px;margin-bottom:24px;"></div>
+      <div style="${s}height:36px;width:55%;margin-bottom:24px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <div style="${s}height:340px;border-radius:12px;"></div>
+        <div>
+          <div style="${s}height:44px;width:45%;margin-bottom:16px;"></div>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <div style="${s}height:28px;width:80px;border-radius:20px;"></div>
+            <div style="${s}height:28px;width:60px;border-radius:20px;"></div>
+            <div style="${s}height:28px;width:70px;border-radius:20px;"></div>
+          </div>
+          <div style="${s}height:14px;width:90%;margin-bottom:8px;"></div>
+          <div style="${s}height:14px;width:75%;margin-bottom:24px;"></div>
+          <div style="${s}height:80px;border-radius:12px;margin-bottom:16px;"></div>
+          <div style="${s}height:44px;border-radius:8px;margin-bottom:10px;"></div>
+          <div style="${s}height:44px;border-radius:8px;"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function renderBikePage(bikeId) {
   const detailView = document.getElementById('detail-view');
   const mainEl     = document.querySelector('.main');
@@ -2345,7 +2380,7 @@ async function renderBikePage(bikeId) {
   if (heroEl)   heroEl.style.display   = 'none';
   if (searchEl) searchEl.style.display = 'none';
   detailView.style.display = 'block';
-  detailView.innerHTML = '<p style="padding:60px 24px;color:var(--muted);text-align:center;">Indlæser annonce...</p>';
+  detailView.innerHTML = renderBikeSkeleton();
 
   let b, error;
   try {
@@ -2355,10 +2390,11 @@ async function renderBikePage(bikeId) {
   }
 
   if (error || !b) {
+    const errBackAction = history.length > 1 ? 'history.back()' : "window.location.hash='#/'";
     detailView.innerHTML = `
       <div style="padding:60px 24px;text-align:center;">
         <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce.</p>
-        <button onclick="history.back()" style="background:var(--forest);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;">← Tilbage</button>
+        <button onclick="${errBackAction}" style="background:var(--forest);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;">← Tilbage</button>
       </div>`;
     return;
   }
@@ -2370,9 +2406,10 @@ async function renderBikePage(bikeId) {
   document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
 
   const { html, profile } = buildBikeBodyHTML(b);
+  const backAction = history.length > 1 ? 'history.back()' : "window.location.hash='#/'";
   detailView.innerHTML = `
     <div style="max-width:1000px;margin:0 auto;padding:20px 16px;">
-      <button onclick="history.back()" style="margin-bottom:20px;background:none;border:1px solid var(--border);padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--charcoal);">← Tilbage</button>
+      <button onclick="${backAction}" style="margin-bottom:20px;background:none;border:1px solid var(--border);padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--charcoal);">← Tilbage</button>
       <h1 style="font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700;margin-bottom:20px;color:var(--charcoal);">${esc(b.brand)} ${esc(b.model)}</h1>
       ${html}
     </div>`;
