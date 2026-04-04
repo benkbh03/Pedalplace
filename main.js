@@ -3222,7 +3222,10 @@ async function openEditModal(id) {
   // Indlæs eksisterende billeder
   editNewFiles     = [];
   editExistingImgs = (b.bike_images || []).map(img => ({ ...img, toDelete: false }));
-  console.log(`[IMAGE-EDIT-DEBUG] openEditModal: loaded ${editExistingImgs.length} existing images`, editExistingImgs.map(i => ({ id: i.id, is_primary: i.is_primary })));
+  console.log(`[IMAGE-EDIT-TRACE] openEditModal LOADED`,
+    `existing=${editExistingImgs.length}`, `new=${editNewFiles.length}`,
+    `images:`, editExistingImgs.map(i => ({ id: i.id, idType: typeof i.id, is_primary: i.is_primary, toDelete: i.toDelete }))
+  );
   enforceSinglePrimaryImage();
   renderEditExistingImages();
   renderEditNewImages();
@@ -3236,7 +3239,10 @@ function enforceSinglePrimaryImage() {
   const existingPrimaries = editExistingImgs.filter(img => !img.toDelete && img.is_primary);
   const newPrimaries      = editNewFiles.filter(f => f.isPrimary);
   const total = existingPrimaries.length + newPrimaries.length;
-  console.log(`[IMAGE-EDIT-DEBUG] enforceSinglePrimaryImage: ${total} primaries (existing:${existingPrimaries.length}, new:${newPrimaries.length})`);
+  console.log(`[IMAGE-EDIT-TRACE] enforceSinglePrimaryImage`,
+    `total=${total}`, `existingPrimaries=${existingPrimaries.length}`, `newPrimaries=${newPrimaries.length}`,
+    `primaryIds:`, existingPrimaries.map(i => i.id)
+  );
   if (total > 1) {
     // Behold kun den første primære, nulstil alle andre
     let keptOne = false;
@@ -3261,55 +3267,104 @@ function enforceSinglePrimaryImage() {
 
 function renderEditExistingImages() {
   const grid = document.getElementById('edit-img-existing-grid');
-  if (!grid) return;
+  if (!grid) {
+    console.warn('[IMAGE-EDIT-TRACE] renderEditExistingImages: grid element NOT FOUND');
+    return;
+  }
   const visible = editExistingImgs.filter(img => !img.toDelete);
-  console.log(`[IMAGE-EDIT-DEBUG] renderEditExistingImages: ${visible.length} visible`, visible.map(i => ({ id: i.id, is_primary: i.is_primary })));
-  // Brug img.id i onclick i stedet for array-index — robust mod state-drift
+  const toDeleteIds = editExistingImgs.filter(img => img.toDelete).map(i => i.id);
+  const primaryIds  = editExistingImgs.filter(img => img.is_primary).map(i => i.id);
+  console.log(`[IMAGE-EDIT-TRACE] renderEditExistingImages`,
+    `visible=${visible.length}`, `toDelete=${toDeleteIds.length}`,
+    `visibleIds:`, visible.map(i => i.id),
+    `toDeleteIds:`, toDeleteIds,
+    `primaryIds:`, primaryIds
+  );
+  // VIGTIG: img.id sendes som streng i onclick-attribut.
+  // editRemoveExisting sammenligner med == (løs) for at undgå integer vs string mismatch.
   grid.innerHTML = visible.map(img => `
     <div class="img-preview-item ${img.is_primary ? 'primary' : ''}">
       <img src="${img.url}" alt="Billede">
       ${img.is_primary ? '<span class="primary-badge">Primær</span>' : `<button class="set-primary" onclick="editSetExistingPrimary('${img.id}')">★</button>`}
       <button class="remove-img" onclick="editRemoveExisting('${img.id}')">✕</button>
     </div>`).join('') || '';
+  console.log(`[IMAGE-EDIT-TRACE] renderEditExistingImages: grid.innerHTML updated, childCount=${grid.children.length}`);
 }
 
 function editSetExistingPrimary(imgId) {
-  console.log(`[IMAGE-EDIT-DEBUG] editSetExistingPrimary: imgId=${imgId}`);
-  const target = editExistingImgs.find(img => img.id === imgId);
-  if (!target) { console.warn('[IMAGE-EDIT-DEBUG] editSetExistingPrimary: target not found', imgId); return; }
-  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img.id === imgId }));
+  console.log(`[IMAGE-EDIT-TRACE] editSetExistingPrimary CALLED`,
+    `imgId=${imgId}`, `imgIdType=${typeof imgId}`,
+    `existing=${editExistingImgs.length}`, `new=${editNewFiles.length}`,
+    `allIds:`, editExistingImgs.map(i => ({ id: i.id, idType: typeof i.id }))
+  );
+  // == (løs sammenligning) fordi imgId er string fra onclick-attribut, img.id kan være integer fra DB
+  const target = editExistingImgs.find(img => img.id == imgId);
+  if (!target) {
+    console.error('[IMAGE-EDIT-TRACE] editSetExistingPrimary TARGET NOT FOUND — mulig type-mismatch?',
+      `imgId=${imgId} (${typeof imgId})`,
+      `DB ids:`, editExistingImgs.map(i => `${i.id} (${typeof i.id})`)
+    );
+    return;
+  }
+  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img.id == imgId }));
   editNewFiles     = editNewFiles.map(f => ({ ...f, isPrimary: false }));
-  console.log(`[IMAGE-EDIT-DEBUG] editSetExistingPrimary: done, primaries=`, editExistingImgs.filter(i => i.is_primary).map(i => i.id));
+  console.log(`[IMAGE-EDIT-TRACE] editSetExistingPrimary DONE`, `primaries:`, editExistingImgs.filter(i => i.is_primary).map(i => i.id));
   renderEditExistingImages();
   renderEditNewImages();
 }
 
 function editRemoveExisting(imgId) {
-  console.log(`[IMAGE-EDIT-DEBUG] editRemoveExisting: imgId=${imgId}`);
-  const target = editExistingImgs.find(img => img.id === imgId);
-  if (!target) { console.warn('[IMAGE-EDIT-DEBUG] editRemoveExisting: target not found', imgId); return; }
-  const wasPrimary = target.is_primary;
-  editExistingImgs = editExistingImgs.map(img => img.id === imgId ? { ...img, toDelete: true, is_primary: false } : img);
-  console.log(`[IMAGE-EDIT-DEBUG] editRemoveExisting: marked toDelete, wasPrimary=${wasPrimary}`);
-  if (wasPrimary) {
-    // Tildel primær til næste synlige — via enforceSinglePrimaryImage
-    const remaining = editExistingImgs.filter(img => !img.toDelete);
-    if (remaining.length > 0) remaining[0].is_primary = true;
-    else if (editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
-    console.log(`[IMAGE-EDIT-DEBUG] editRemoveExisting: reassigned primary`);
+  console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting CALLED`,
+    `imgId=${imgId}`, `imgIdType=${typeof imgId}`,
+    `existing=${editExistingImgs.length}`, `new=${editNewFiles.length}`,
+    `allIds:`, editExistingImgs.map(i => ({ id: i.id, idType: typeof i.id, toDelete: i.toDelete }))
+  );
+  // == (løs sammenligning) fordi imgId er string fra onclick-attribut, img.id kan være integer fra DB
+  const target = editExistingImgs.find(img => img.id == imgId);
+  if (!target) {
+    console.error('[IMAGE-EDIT-TRACE] editRemoveExisting TARGET NOT FOUND — mulig type-mismatch?',
+      `imgId=${imgId} (${typeof imgId})`,
+      `DB ids:`, editExistingImgs.map(i => `${i.id} (${typeof i.id})`)
+    );
+    return;
   }
-  console.log(`[IMAGE-EDIT-DEBUG] editRemoveExisting: remaining=${editExistingImgs.filter(i => !i.toDelete).length}`);
+  const wasPrimary = target.is_primary;
+  console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting TARGET FOUND`, `id=${target.id}`, `wasPrimary=${wasPrimary}`);
+  // Opdater state — brug == for at matche uanset type
+  editExistingImgs = editExistingImgs.map(img => img.id == imgId ? { ...img, toDelete: true, is_primary: false } : img);
+  console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting STATE AFTER MAP`,
+    `toDeleteCount=${editExistingImgs.filter(i => i.toDelete).length}`,
+    `visibleCount=${editExistingImgs.filter(i => !i.toDelete).length}`,
+    `state:`, editExistingImgs.map(i => ({ id: i.id, toDelete: i.toDelete, is_primary: i.is_primary }))
+  );
+  if (wasPrimary) {
+    const remaining = editExistingImgs.filter(img => !img.toDelete);
+    if (remaining.length > 0) {
+      remaining[0].is_primary = true;
+      console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting REASSIGNED PRIMARY to`, remaining[0].id);
+    } else if (editNewFiles.length > 0) {
+      editNewFiles[0].isPrimary = true;
+      console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting REASSIGNED PRIMARY to new file 0`);
+    } else {
+      console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting NO IMAGES LEFT — no primary assigned`);
+    }
+  }
+  console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting CALLING renderEditExistingImages`);
   renderEditExistingImages();
   renderEditNewImages();
+  console.log(`[IMAGE-EDIT-TRACE] editRemoveExisting DONE`);
 }
 
 function editPreviewImages(input) {
   const files = Array.from(input.files);
   const remaining = 8 - editExistingImgs.filter(img => !img.toDelete).length - editNewFiles.length;
+  console.log(`[IMAGE-EDIT-TRACE] editPreviewImages`, `files=${files.length}`, `remaining=${remaining}`,
+    `existing=${editExistingImgs.length}`, `new=${editNewFiles.length}`);
   files.filter(validateImageFile).slice(0, remaining).forEach((file, i) => {
     const hasPrimary = editExistingImgs.some(img => !img.toDelete && img.is_primary) || editNewFiles.some(f => f.isPrimary);
     editNewFiles.push({ file, url: URL.createObjectURL(file), isPrimary: !hasPrimary && i === 0 });
   });
+  console.log(`[IMAGE-EDIT-TRACE] editPreviewImages AFTER`, `new=${editNewFiles.length}`, editNewFiles.map(f => ({ isPrimary: f.isPrimary })));
   renderEditNewImages();
 }
 
@@ -3379,12 +3434,21 @@ async function saveEditedListing() {
 
   // Slet fjernede billeder
   const toDelete = editExistingImgs.filter(img => img.toDelete);
+  console.log(`[IMAGE-EDIT-TRACE] saveEditedListing`,
+    `existing=${editExistingImgs.length}`, `new=${editNewFiles.length}`,
+    `toDelete=${toDelete.length}`,
+    `toDeleteIds:`, toDelete.map(i => i.id),
+    `keeping:`, editExistingImgs.filter(i => !i.toDelete).map(i => ({ id: i.id, is_primary: i.is_primary })),
+    `newFiles:`, editNewFiles.map(f => ({ isPrimary: f.isPrimary }))
+  );
   for (const img of toDelete) {
+    console.log(`[IMAGE-EDIT-TRACE] saveEditedListing DELETING image id=${img.id}`);
     await supabase.from('bike_images').delete().eq('id', img.id);
   }
 
   // Opdater primær-status på eksisterende billeder
   for (const img of editExistingImgs.filter(img => !img.toDelete)) {
+    console.log(`[IMAGE-EDIT-TRACE] saveEditedListing UPDATING image id=${img.id} is_primary=${img.is_primary}`);
     await supabase.from('bike_images').update({ is_primary: img.is_primary }).eq('id', img.id);
   }
 
