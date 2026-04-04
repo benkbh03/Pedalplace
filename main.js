@@ -13,6 +13,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser    = null;
 let currentProfile = null;
 
+// Stale-request guards: hvert modal-open incrementerer sit token.
+// Async responses tjekker om tokenet stadig matcher — ellers ignoreres response.
+let _bikeModalToken = 0;
+let _userProfileToken = 0;
+let _dealerProfileToken = 0;
+
 // Hjælper: deaktiver knap og vis spinner, returnerer gendan-funktion
 function btnLoading(id, label) {
   const btn = document.getElementById(id);
@@ -524,7 +530,8 @@ function filterByDealerCard(dealerId) {
 }
 
 async function openDealerProfile(dealerId) {
-  console.log(`[IDLE-DEBUG] openDealerProfile START: dealerId=${dealerId}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
+  const myToken = ++_dealerProfileToken;
+  console.log(`[IDLE-DEBUG] openDealerProfile START: dealerId=${dealerId}, token=${myToken}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
   closeAllDealersModal();
   const modal = document.getElementById('dealer-profile-modal');
   const header = document.getElementById('dealer-profile-header');
@@ -549,6 +556,12 @@ async function openDealerProfile(dealerId) {
   } catch (e) {
     dealerErr = e;
     console.error(`[IDLE-DEBUG] openDealerProfile: dealer fetch EXCEPTION/TIMEOUT: ${e.message}`);
+  }
+
+  // Stale-guard: en nyere åbning er startet — ignorer dette response
+  if (myToken !== _dealerProfileToken) {
+    console.log(`[IDLE-DEBUG] openDealerProfile: STALE response ignored (token ${myToken} !== ${_dealerProfileToken})`);
+    return;
   }
 
   if (!dealer) {
@@ -581,6 +594,12 @@ async function openDealerProfile(dealerId) {
     <hr class="dealer-profile-divider">
     <h3 class="dealer-profile-section-title">Cykler til salg</h3>
   `;
+
+  // Stale-guard før bikes-fetch
+  if (myToken !== _dealerProfileToken) {
+    console.log(`[IDLE-DEBUG] openDealerProfile: STALE before bikes fetch (token ${myToken} !== ${_dealerProfileToken})`);
+    return;
+  }
 
   // Hent forhandlerens cykler
   let bikes, bikesErr;
@@ -675,7 +694,8 @@ async function openUserProfileWithReview(userId) {
 }
 
 async function openUserProfile(userId) {
-  console.log(`[IDLE-DEBUG] openUserProfile START: userId=${userId}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
+  const myToken = ++_userProfileToken;
+  console.log(`[IDLE-DEBUG] openUserProfile START: userId=${userId}, token=${myToken}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
   closeAllModals();
   const modal   = document.getElementById('user-profile-modal');
   const content = document.getElementById('user-profile-content');
@@ -720,6 +740,12 @@ async function openUserProfile(userId) {
     console.error(`[IDLE-DEBUG] openUserProfile EXCEPTION/TIMEOUT: ${err.message}`);
     console.log(`[IDLE-DEBUG] openUserProfile: setting error HTML`);
     content.innerHTML = retryHTML('Kunne ikke hente profil.', `() => openUserProfile('${userId}')`);
+    return;
+  }
+
+  // Stale-guard: en nyere åbning er startet — ignorer dette response
+  if (myToken !== _userProfileToken) {
+    console.log(`[IDLE-DEBUG] openUserProfile: STALE response ignored (token ${myToken} !== ${_userProfileToken})`);
     return;
   }
 
@@ -2099,11 +2125,13 @@ function showSection(section) {
    ============================================================ */
 
 async function openBikeModal(bikeId) {
-  console.log(`[IDLE-DEBUG] openBikeModal START: bikeId=${bikeId}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
+  const myToken = ++_bikeModalToken;
+  console.log(`[IDLE-DEBUG] openBikeModal START: bikeId=${bikeId}, token=${myToken}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
   closeAllModals();
   document.getElementById('bike-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
+  document.getElementById('bike-modal-title').textContent = '';
 
   let b, error;
   try {
@@ -2117,6 +2145,12 @@ async function openBikeModal(bikeId) {
   } catch (e) {
     error = e;
     console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION/TIMEOUT: ${e.message}`);
+  }
+
+  // Stale-guard: en nyere åbning er startet — ignorer dette response
+  if (myToken !== _bikeModalToken) {
+    console.log(`[IDLE-DEBUG] openBikeModal: STALE response ignored (token ${myToken} !== ${_bikeModalToken})`);
+    return;
   }
 
   // Tæl visning (fire-and-forget, kun ikke-ejere)
