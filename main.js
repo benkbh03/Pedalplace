@@ -164,21 +164,60 @@ async function init() {
     }
   });
 
+  // --- Idle/refresh guards ---
+  let _refreshInProgress = false;
+  let _lastRefreshTime = 0;
+  const REFRESH_THROTTLE_MS = 5000; // mindst 5s mellem refreshes
+
+  function _isAnyModalOpen() {
+    // Check display='flex' modals
+    for (const id of ['dealer-profile-modal', 'user-profile-modal', 'all-dealers-modal', 'login-modal', 'share-modal', 'report-modal', 'inbox-modal']) {
+      const el = document.getElementById(id);
+      if (el && el.style.display === 'flex') return true;
+    }
+    // Check classList='open' modals
+    for (const id of ['bike-modal', 'map-bike-modal']) {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('open')) return true;
+    }
+    return false;
+  }
+
   // Refresh session + data når bruger vender tilbage til fanen
-  // Debounce: forhindrer spam ved hurtig tab-switch
+  // Guards: throttle, concurrent protection, skip if modal open
   let _visibilityTimeout = null;
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     clearTimeout(_visibilityTimeout);
     _visibilityTimeout = setTimeout(async () => {
+      // Guard: skip if a modal is open
+      if (_isAnyModalOpen()) {
+        console.log(`[IDLE-DEBUG] visibilitychange: SKIPPED — modal is open`);
+        return;
+      }
+      // Guard: throttle
+      const now = Date.now();
+      if (now - _lastRefreshTime < REFRESH_THROTTLE_MS) {
+        console.log(`[IDLE-DEBUG] visibilitychange: SKIPPED — throttled (${now - _lastRefreshTime}ms since last)`);
+        return;
+      }
+      // Guard: concurrent refresh
+      if (_refreshInProgress) {
+        console.log(`[IDLE-DEBUG] visibilitychange: SKIPPED — refresh already in progress`);
+        return;
+      }
+      _refreshInProgress = true;
+      _lastRefreshTime = now;
       console.log(`[IDLE-DEBUG] visibilitychange (500ms debounce): triggering session refresh + loadBikes()`);
-      const { data, error } = await supabase.auth.getSession();
-      loadBikes();
-      // Opdater last_seen når brugeren vender tilbage til fanen
-      if (currentUser) {
-        supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id).then(() => {
-        }, (err) => {
-        });
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        loadBikes();
+        // Opdater last_seen når brugeren vender tilbage til fanen
+        if (currentUser) {
+          supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', currentUser.id).then(() => {}, (err) => {});
+        }
+      } finally {
+        _refreshInProgress = false;
       }
       // updateFilterCounts opdateres kun ved initial load og efter mutationer
     }, 500);
@@ -500,11 +539,13 @@ async function openDealerProfile(dealerId) {
   // Hent forhandlerens profil
   let dealer, dealerErr;
   try {
-    ({ data: dealer, error: dealerErr } = await supabase
+    const fetchPromise = supabase
       .from('profiles')
       .select('id, shop_name, name, city, verified, avatar_url')
       .eq('id', dealerId)
-      .single());
+      .single();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: forhandlerforespørgsel tog for lang tid')), 15000));
+    ({ data: dealer, error: dealerErr } = await Promise.race([fetchPromise, timeoutPromise]));
   } catch (e) {
     dealerErr = e;
     console.error(`[IDLE-DEBUG] openDealerProfile: dealer fetch EXCEPTION/TIMEOUT: ${e.message}`);
@@ -544,18 +585,24 @@ async function openDealerProfile(dealerId) {
   // Hent forhandlerens cykler
   let bikes, bikesErr;
   try {
-    ({ data: bikes, error: bikesErr } = await supabase
+    const bikesFetch = supabase
       .from('bikes')
       .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
       .eq('user_id', dealerId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false }));
+      .order('created_at', { ascending: false });
+    const bikesTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: forhandlercykler tog for lang tid')), 15000));
+    ({ data: bikes, error: bikesErr } = await Promise.race([bikesFetch, bikesTimeout]));
   } catch (e) {
     bikesErr = e;
     console.error(`[IDLE-DEBUG] openDealerProfile: bikes fetch EXCEPTION/TIMEOUT: ${e.message}`);
   }
 
-  if (!bikes || bikes.length === 0) {
+  if (bikesErr || !bikes) {
+    bikesGrid.innerHTML = retryHTML('Kunne ikke hente forhandlerens cykler.', `() => openDealerProfile('${dealerId}')`);
+    return;
+  }
+  if (bikes.length === 0) {
     bikesGrid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);">
         <div style="font-size:3rem;margin-bottom:12px;">🚲</div>
@@ -642,12 +689,14 @@ async function openUserProfile(userId) {
   try {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
-    const [r1, r2, r3, r4] = await Promise.all([
+    const dataPromise = Promise.all([
       safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url, last_seen, bio').eq('id', userId).single()),
       safe(supabase.from('bikes').select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
     ]);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: profilforespørgsel tog for lang tid')), 15000));
+    const [r1, r2, r3, r4] = await Promise.race([dataPromise, timeoutPromise]);
 
     profile     = r1.data;
     activeBikes = r2.data;
@@ -668,14 +717,14 @@ async function openUserProfile(userId) {
       messagesCount = 0;
     }
   } catch (err) {
-    console.error(`[IDLE-DEBUG] openUserProfile EXCEPTION: ${err.message}`);
+    console.error(`[IDLE-DEBUG] openUserProfile EXCEPTION/TIMEOUT: ${err.message}`);
     console.log(`[IDLE-DEBUG] openUserProfile: setting error HTML`);
-    content.innerHTML = '<p style="color:var(--rust);padding:40px;text-align:center;">Fejl ved hentning af profil.</p>';
+    content.innerHTML = retryHTML('Kunne ikke hente profil.', `() => openUserProfile('${userId}')`);
     return;
   }
 
   if (!profile) {
-    content.innerHTML = '<p style="color:var(--rust);padding:40px;text-align:center;">Kunne ikke hente profil.</p>';
+    content.innerHTML = retryHTML('Kunne ikke hente profil.', `() => openUserProfile('${userId}')`);
     return;
   }
 
@@ -2058,14 +2107,16 @@ async function openBikeModal(bikeId) {
 
   let b, error;
   try {
-    ({ data: b, error } = await supabase
+    const fetchPromise = supabase
       .from('bikes')
       .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
       .eq('id', bikeId)
-      .single());
+      .single();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: annonceforespørgsel tog for lang tid')), 15000));
+    ({ data: b, error } = await Promise.race([fetchPromise, timeoutPromise]));
   } catch (e) {
     error = e;
-    console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION: ${e.message}`);
+    console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION/TIMEOUT: ${e.message}`);
   }
 
   // Tæl visning (fire-and-forget, kun ikke-ejere)
