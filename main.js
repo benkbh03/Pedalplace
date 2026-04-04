@@ -57,18 +57,6 @@ function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Hjælper: wrapper der tilføjer timeout til Supabase queries
-// Forhindrer at modaler hænger i "Henter..." for evigt hvis en query aldrig resolver
-function queryWithTimeout(promise, ms) {
-  if (!ms) ms = 12000;
-  return Promise.race([
-    promise,
-    new Promise(function(_, reject) {
-      setTimeout(function() { reject(new Error('Query timeout efter ' + ms + 'ms')); }, ms);
-    })
-  ]);
-}
-
 // Hjælper: focus trap — returnerer cleanup-funktion
 function trapFocus(modalEl) {
   const focusable = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -521,11 +509,11 @@ async function openDealerProfile(dealerId) {
   // Hent forhandlerens profil
   let dealer, dealerErr;
   try {
-    ({ data: dealer, error: dealerErr } = await queryWithTimeout(supabase
+    ({ data: dealer, error: dealerErr } = await supabase
       .from('profiles')
       .select('id, shop_name, name, city, verified, avatar_url')
       .eq('id', dealerId)
-      .single()));
+      .single());
   } catch (e) {
     dealerErr = e;
     console.error(`[IDLE-DEBUG] openDealerProfile: dealer fetch EXCEPTION/TIMEOUT: ${e.message}`);
@@ -565,12 +553,12 @@ async function openDealerProfile(dealerId) {
   // Hent forhandlerens cykler
   let bikes, bikesErr;
   try {
-    ({ data: bikes, error: bikesErr } = await queryWithTimeout(supabase
+    ({ data: bikes, error: bikesErr } = await supabase
       .from('bikes')
       .select('*, profiles(name, seller_type, shop_name, verified, id_verified), bike_images(url, is_primary)')
       .eq('user_id', dealerId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false })));
+      .order('created_at', { ascending: false }));
   } catch (e) {
     bikesErr = e;
     console.error(`[IDLE-DEBUG] openDealerProfile: bikes fetch EXCEPTION/TIMEOUT: ${e.message}`);
@@ -663,12 +651,12 @@ async function openUserProfile(userId) {
   try {
     const safe = p => Promise.resolve(p).catch(e => { console.warn('Query fejl:', e); return { data: null, error: e }; });
 
-    const [r1, r2, r3, r4] = await queryWithTimeout(Promise.all([
+    const [r1, r2, r3, r4] = await Promise.all([
       safe(supabase.from('profiles').select('id, name, shop_name, seller_type, city, address, verified, id_verified, created_at, avatar_url, last_seen, bio').eq('id', userId).single()),
       safe(supabase.from('bikes').select('id, brand, model, price, type, city, condition, year, warranty, is_active, created_at, bike_images(url, is_primary)').eq('user_id', userId).eq('is_active', true).order('created_at', { ascending: false })),
       safe(supabase.from('bikes').select('brand, model, price, type, condition, year, city').eq('user_id', userId).eq('is_active', false).order('created_at', { ascending: false })),
       safe(supabase.from('reviews').select('*, reviewer:profiles(name, shop_name, seller_type)').eq('reviewed_user_id', userId).order('created_at', { ascending: false })),
-    ]));
+    ]);
 
     profile     = r1.data;
     activeBikes = r2.data;
@@ -2079,11 +2067,11 @@ async function openBikeModal(bikeId) {
 
   let b, error;
   try {
-    ({ data: b, error } = await queryWithTimeout(supabase
+    ({ data: b, error } = await supabase
       .from('bikes')
       .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
       .eq('id', bikeId)
-      .single()));
+      .single());
   } catch (e) {
     error = e;
     console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION: ${e.message}`);
