@@ -143,6 +143,14 @@ async function init() {
       _hasHadSession = true;
       currentUser = session.user;
       console.log(`[IDLE-DEBUG] onAuthStateChange: currentUser.id=${currentUser.id}, isNewLogin=${isNewLogin}`);
+
+      if (_event === 'SIGNED_IN' && !isNewLogin) {
+        // Token-refresh pseudo-SIGNED_IN: opdater kun currentUser (har nyt token) — ingen sideeffekter
+        console.log(`[IDLE-DEBUG] onAuthStateChange: SIGNED_IN from token-refresh, SKIPPING profile fetch + loadBikes`);
+        return;
+      }
+
+      // Ægte login eller TOKEN_REFRESHED/andre events: hent profil og opdater UI
       const { data: profile, error: profileErr } = await supabase
         .from('profiles').select('*').eq('id', currentUser.id).single();
       if (profileErr) console.warn('[IDLE-DEBUG] onAuthStateChange profile fetch FAIL:', profileErr.message);
@@ -151,12 +159,9 @@ async function init() {
       var adminBtn = document.getElementById('nav-admin');
       if (adminBtn) adminBtn.style.display = profile?.is_admin ? 'flex' : 'none';
       checkEmailConfirmed();
-      // Kun reload annoncer ved ægte nyt login — IKKE ved token-refresh der fyrer SIGNED_IN
       if (_event === 'SIGNED_IN' && isNewLogin) {
         console.log(`[IDLE-DEBUG] onAuthStateChange: genuine SIGNED_IN, calling loadBikes()`);
         loadBikes();
-      } else if (_event === 'SIGNED_IN') {
-        console.log(`[IDLE-DEBUG] onAuthStateChange: SIGNED_IN from token-refresh, SKIPPING loadBikes()`);
       }
     } else {
       _hasHadSession = false;
