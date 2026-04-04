@@ -13,6 +13,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser    = null;
 let currentProfile = null;
 
+// Brugerens gemte bike-IDs — opdateres ved loadBikes og toggleSave
+let _userSavedSet = new Set();
+
 // Stale-request guards: hvert modal-open incrementerer sit token.
 // Async responses tjekker om tokenet stadig matcher — ellers ignoreres response.
 let _bikeModalToken = 0;
@@ -645,7 +648,7 @@ async function openDealerProfile(dealerId) {
         <div class="bike-card-img">
           ${imgContent}
           <span class="condition-tag">${b.condition}</span>
-          <button class="save-btn" onclick="event.stopPropagation();toggleSave(this,'${b.id}')">🤍</button>
+          <button class="save-btn" onclick="event.stopPropagation();toggleSave(this,'${b.id}')">${_userSavedSet.has(b.id) ? '❤️' : '🤍'}</button>
         </div>
         <div class="bike-card-body">
           <div class="card-top">
@@ -1135,25 +1138,30 @@ async function loadBikes(filters = {}, append = false) {
     ? rawData.filter(b => b.profiles?.seller_type === filters.sellerType)
     : rawData;
 
-  // Hent favorit-tæller for alle viste bikes i én query
+  // Hent favorit-tæller + brugerens egne gemte bikes i én query
   const bikeIds = data.map(b => b.id);
   let saveCounts = {};
+  let userSavedSet = new Set();
   if (bikeIds.length > 0) {
     const { data: countData } = await supabase
       .from('saved_bikes')
-      .select('bike_id')
+      .select('bike_id, user_id')
       .in('bike_id', bikeIds);
     if (countData) {
       countData.forEach(row => {
         saveCounts[row.bike_id] = (saveCounts[row.bike_id] || 0) + 1;
+        if (currentUser && row.user_id === currentUser.id) {
+          userSavedSet.add(row.bike_id);
+          _userSavedSet.add(row.bike_id);
+        }
       });
     }
   }
 
   if (append) {
-    renderBikes(data, true, saveCounts);
+    renderBikes(data, true, saveCounts, userSavedSet);
   } else {
-    renderBikes(data, false, saveCounts);
+    renderBikes(data, false, saveCounts, userSavedSet);
   }
 
   bikesOffset += data.length;
@@ -1175,7 +1183,7 @@ async function loadBikes(filters = {}, append = false) {
   grid.after(footer);
 }
 
-function renderBikes(bikes, append = false, saveCounts = {}) {
+function renderBikes(bikes, append = false, saveCounts = {}, userSavedSet = new Set()) {
   const grid = document.getElementById('listings-grid');
 
   if (!append && (!bikes || bikes.length === 0)) {
@@ -1212,7 +1220,7 @@ function renderBikes(bikes, append = false, saveCounts = {}) {
           <span class="condition-tag">${b.condition}</span>
           ${b.warranty && !isSold ? '<span class="warranty-card-badge">🛡️ Garanti</span>' : ''}
           ${saveCount > 0 ? `<span class="fav-count-badge">❤ ${saveCount}</span>` : ''}
-          ${!isSold ? `<button class="save-btn" onclick="event.stopPropagation();toggleSave(this,'${b.id}')">🤍</button>` : ''}
+          ${!isSold ? `<button class="save-btn" onclick="event.stopPropagation();toggleSave(this,'${b.id}')">${userSavedSet.has(b.id) ? '❤️' : '🤍'}</button>` : ''}
         </div>
         <div class="bike-card-body">
           <div class="card-top">
@@ -1329,11 +1337,13 @@ async function toggleSave(btn, bikeId) {
     const { error } = await supabase.from('saved_bikes').delete().eq('user_id', currentUser.id).eq('bike_id', bikeId);
     if (error) { showToast('❌ Kunne ikke fjerne fra gemte'); return; }
     btn.textContent = '🤍';
+    _userSavedSet.delete(bikeId);
     showToast('Fjernet fra gemte');
   } else {
     const { error } = await supabase.from('saved_bikes').insert({ user_id: currentUser.id, bike_id: bikeId });
     if (error) { showToast('❌ Kunne ikke gemme annonce'); return; }
     btn.textContent = '❤️';
+    _userSavedSet.add(bikeId);
     showToast('❤️ Gemt! Find den under Gemte i din profil.');
   }
 }
