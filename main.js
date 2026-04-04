@@ -294,6 +294,12 @@ async function init() {
     if (e.target === e.currentTarget) closeShareModal();
   });
 
+  // Hash routing: håndter initial route (køres efter Supabase hash-params er tjekket)
+  const _initHash = window.location.hash;
+  if (!_initHash.includes('type=signup') && !_initHash.includes('type=recovery')) {
+    handleRoute();
+  }
+
   // Global Escape-tast: lukker den øverste åbne modal
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
@@ -644,7 +650,7 @@ async function openDealerProfile(dealerId) {
       ? `<img src="${primaryImg}" alt="${b.brand} ${b.model}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
       : '<span style="font-size:4rem">🚲</span>';
     return `
-      <div class="bike-card" style="animation-delay:${i * 50}ms" onclick="openBikeModal('${b.id}')">
+      <div class="bike-card" style="animation-delay:${i * 50}ms" onclick="navigateToBike('${b.id}')">
         <div class="bike-card-img">
           ${imgContent}
           <span class="condition-tag">${b.condition}</span>
@@ -1213,7 +1219,7 @@ function renderBikes(bikes, append = false, saveCounts = {}, userSavedSet = new 
     var isSold = !b.is_active;
     var saveCount = saveCounts[b.id] || 0;
     return `
-      <div class="bike-card" style="animation-delay:${(startIndex + i) * 50}ms;${isSold ? 'opacity:0.7' : ''}" onclick="${isSold ? '' : "openBikeModal('" + b.id + "')"}">
+      <div class="bike-card" style="animation-delay:${(startIndex + i) * 50}ms;${isSold ? 'opacity:0.7' : ''}" onclick="${isSold ? '' : "navigateToBike('" + b.id + "')"}">
         <div class="bike-card-img">
           ${imgContent}
           ${isSold ? '<div class="sold-tag"><span>SOLGT</span></div>' : ''}
@@ -2131,66 +2137,32 @@ function showSection(section) {
 
 
 /* ============================================================
-   ANNONCE DETALJE MODAL
+   ANNONCE DETALJE — FÆLLES FETCH + HTML BUILDER
    ============================================================ */
 
-async function openBikeModal(bikeId) {
-  const myToken = ++_bikeModalToken;
-  console.log(`[IDLE-DEBUG] openBikeModal START: bikeId=${bikeId}, token=${myToken}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
-  closeAllModals();
-  document.getElementById('bike-modal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
-  document.getElementById('bike-modal-title').textContent = '';
+async function fetchBikeById(bikeId) {
+  const fetchPromise = supabase
+    .from('bikes')
+    .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
+    .eq('id', bikeId)
+    .single();
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Timeout: annonceforespørgsel tog for lang tid')), 15000));
+  return Promise.race([fetchPromise, timeoutPromise]);
+}
 
-  let b, error;
-  try {
-    const fetchPromise = supabase
-      .from('bikes')
-      .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
-      .eq('id', bikeId)
-      .single();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout: annonceforespørgsel tog for lang tid')), 15000));
-    ({ data: b, error } = await Promise.race([fetchPromise, timeoutPromise]));
-  } catch (e) {
-    error = e;
-    console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION/TIMEOUT: ${e.message}`);
-  }
-
-  // Stale-guard: en nyere åbning er startet — ignorer dette response
-  if (myToken !== _bikeModalToken) {
-    console.log(`[IDLE-DEBUG] openBikeModal: STALE response ignored (token ${myToken} !== ${_bikeModalToken})`);
-    return;
-  }
-
-  // Tæl visning (fire-and-forget, kun ikke-ejere)
-  if (b && (!currentUser || currentUser.id !== b.user_id)) {
-    supabase.rpc('increment_bike_views', { bike_id: bikeId }).then(null, (err) => {
-    });
-  }
-
-  if (error || !b) {
-    document.getElementById('bike-modal-body').innerHTML = `
-      <div style="text-align:center;padding:40px 20px;">
-        <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce – tjek din internetforbindelse.</p>
-        <button onclick="openBikeModal('${bikeId}')" style="background:var(--rust);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:0.9rem;">Prøv igen</button>
-      </div>`;
-    return;
-  }
-
-  let profile, sellerType, sellerName, initials;
-  try {
-  profile    = b.profiles || {};
-  sellerType = profile.seller_type || 'private';
-  sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
-  initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
+function buildBikeBodyHTML(b) {
+  const profile    = b.profiles || {};
+  const sellerType = profile.seller_type || 'private';
+  const sellerName = sellerType === 'dealer' ? profile.shop_name : profile.name;
+  const initials   = (sellerName || 'U').substring(0, 2).toUpperCase();
+  const isOwner    = currentUser && currentUser.id === profile.id;
 
   // Sorter billeder: primærbillede først
-  const allImages = (b.bike_images || []).slice().sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+  const allImages = (b.bike_images || []).slice().sort((a, x) => (x.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
   window._galleryImages = allImages.map(img => img.url);
   window._galleryIndex  = 0;
 
-  // Byg galleri HTML
   let galleryHtml;
   if (allImages.length === 0) {
     galleryHtml = `<div class="bike-detail-img"><span style="font-size:4rem">🚲</span></div>`;
@@ -2220,33 +2192,8 @@ async function openBikeModal(bikeId) {
       </div>`;
   }
 
-  const isOwner = currentUser && currentUser.id === profile.id;
-
-  document.getElementById('bike-modal-title').textContent = `${b.brand} ${b.model}`;
-
-  // Dynamisk SEO: opdater document.title og OG-tags
-  const _origTitle = document.title;
-  document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
-  const _setMeta = (prop, val) => {
-    let el = document.querySelector(`meta[property="${prop}"]`);
-    if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
-    el.setAttribute('content', val);
-  };
-  _setMeta('og:title', `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr.`);
-  _setMeta('og:description', b.description || `${b.type} · ${b.condition}${b.city ? ' · ' + b.city : ''} – til salg på Cykelbørsen`);
-  const _primaryImgUrl = allImages[0]?.url;
-  if (_primaryImgUrl) _setMeta('og:image', _primaryImgUrl);
-  // Gem original og:title/description til gendannelse ved lukning
-  document.getElementById('bike-modal')._restoreTitle = () => {
-    document.title = _origTitle;
-    // Fjern dynamisk tilsatte og:image tag hvis det ikke var der i forvejen
-    const ogImage = document.querySelector('meta[property="og:image"]');
-    if (ogImage && !ogImage.dataset.static) ogImage.remove();
-    _setMeta('og:title', 'Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark');
-    _setMeta('og:description', 'Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce.');
-  };
-
-  document.getElementById('bike-modal-body').innerHTML = `
+  return {
+    html: `
     <div class="bike-detail-grid">
       <div>
         ${galleryHtml}
@@ -2302,26 +2249,167 @@ async function openBikeModal(bikeId) {
       <h3 style="font-family:'Fraunces',serif;font-size:1rem;margin-bottom:10px;">Beskrivelse</h3>
       <div class="bike-detail-description">${esc(b.description).replace(/\n/g, '<br>')}</div>
     </div>` : ''}
-
-    <!-- Sælgerens andre annoncer -->
     <div id="seller-other-listings" style="margin-top:28px;"></div>
-
-    <!-- Lignende annoncer -->
     <div id="similar-listings" style="margin-top:24px;"></div>
-  `;
+  `,
+    profile,
+    allImages,
+  };
+}
 
-  // Tilknyt swipe-navigation på mobil
-  attachGallerySwipe();
+/* ============================================================
+   ANNONCE DETALJE MODAL
+   ============================================================ */
 
-  // Hent responstid, sælgers andre annoncer og lignende (asynkront efter render)
-  loadResponseTime(profile.id);
-  loadSellerOtherListings(profile.id, b.id);
-  loadSimilarListings(b.type, b.id);
+async function openBikeModal(bikeId) {
+  const myToken = ++_bikeModalToken;
+  console.log(`[IDLE-DEBUG] openBikeModal START: bikeId=${bikeId}, token=${myToken}, currentUser.id=${currentUser?.id || 'none'}, hidden=${document.hidden}`);
+  closeAllModals();
+  document.getElementById('bike-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('bike-modal-body').innerHTML = '<p style="color:var(--muted)">Indlæser...</p>';
+  document.getElementById('bike-modal-title').textContent = '';
 
+  let b, error;
+  try {
+    ({ data: b, error } = await fetchBikeById(bikeId));
+  } catch (e) {
+    error = e;
+    console.error(`[IDLE-DEBUG] openBikeModal: bike fetch EXCEPTION/TIMEOUT: ${e.message}`);
+  }
+
+  // Stale-guard: en nyere åbning er startet — ignorer dette response
+  if (myToken !== _bikeModalToken) {
+    console.log(`[IDLE-DEBUG] openBikeModal: STALE response ignored (token ${myToken} !== ${_bikeModalToken})`);
+    return;
+  }
+
+  // Tæl visning (fire-and-forget, kun ikke-ejere)
+  if (b && (!currentUser || currentUser.id !== b.user_id)) {
+    supabase.rpc('increment_bike_views', { bike_id: bikeId }).then(null, () => {});
+  }
+
+  if (error || !b) {
+    document.getElementById('bike-modal-body').innerHTML = `
+      <div style="text-align:center;padding:40px 20px;">
+        <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce – tjek din internetforbindelse.</p>
+        <button onclick="openBikeModal('${bikeId}')" style="background:var(--rust);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:0.9rem;">Prøv igen</button>
+      </div>`;
+    return;
+  }
+
+  try {
+    const { html, profile, allImages } = buildBikeBodyHTML(b);
+    document.getElementById('bike-modal-title').textContent = `${b.brand} ${b.model}`;
+
+    // Dynamisk SEO: opdater document.title og OG-tags
+    const _origTitle = document.title;
+    document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
+    const _setMeta = (prop, val) => {
+      let el = document.querySelector(`meta[property="${prop}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
+      el.setAttribute('content', val);
+    };
+    _setMeta('og:title', `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr.`);
+    _setMeta('og:description', b.description || `${b.type} · ${b.condition}${b.city ? ' · ' + b.city : ''} – til salg på Cykelbørsen`);
+    if (allImages[0]?.url) _setMeta('og:image', allImages[0].url);
+    document.getElementById('bike-modal')._restoreTitle = () => {
+      document.title = _origTitle;
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      if (ogImage && !ogImage.dataset.static) ogImage.remove();
+      _setMeta('og:title', 'Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark');
+      _setMeta('og:description', 'Danmarks markedsplads for brugte cykler. Køb og sælg racercykler, mountainbikes, el-cykler og meget mere. Gratis at oprette annonce.');
+    };
+
+    document.getElementById('bike-modal-body').innerHTML = html;
+    attachGallerySwipe();
+    loadResponseTime(profile.id);
+    loadSellerOtherListings(profile.id, b.id);
+    loadSimilarListings(b.type, b.id);
   } catch (renderErr) {
     console.error(`[IDLE-DEBUG] openBikeModal RENDER EXCEPTION: ${renderErr.message}`);
     document.getElementById('bike-modal-body').innerHTML = retryHTML('Kunne ikke vise annonce.', `() => openBikeModal('${bikeId}')`);
   }
+}
+
+/* ============================================================
+   ANNONCE DETALJE PAGE (hash routing)
+   ============================================================ */
+
+async function renderBikePage(bikeId) {
+  const detailView = document.getElementById('detail-view');
+  const mainEl     = document.querySelector('.main');
+  const heroEl     = document.querySelector('.hero');
+  const searchEl   = document.querySelector('.search-section');
+  if (mainEl)   mainEl.style.display   = 'none';
+  if (heroEl)   heroEl.style.display   = 'none';
+  if (searchEl) searchEl.style.display = 'none';
+  detailView.style.display = 'block';
+  detailView.innerHTML = '<p style="padding:60px 24px;color:var(--muted);text-align:center;">Indlæser annonce...</p>';
+
+  let b, error;
+  try {
+    ({ data: b, error } = await fetchBikeById(bikeId));
+  } catch (e) {
+    error = e;
+  }
+
+  if (error || !b) {
+    detailView.innerHTML = `
+      <div style="padding:60px 24px;text-align:center;">
+        <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce.</p>
+        <button onclick="history.back()" style="background:var(--forest);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;">← Tilbage</button>
+      </div>`;
+    return;
+  }
+
+  if (!currentUser || currentUser.id !== b.user_id) {
+    supabase.rpc('increment_bike_views', { bike_id: bikeId }).then(null, () => {});
+  }
+
+  document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
+
+  const { html, profile } = buildBikeBodyHTML(b);
+  detailView.innerHTML = `
+    <div style="max-width:1000px;margin:0 auto;padding:20px 16px;">
+      <button onclick="history.back()" style="margin-bottom:20px;background:none;border:1px solid var(--border);padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.9rem;color:var(--charcoal);">← Tilbage</button>
+      <h1 style="font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700;margin-bottom:20px;color:var(--charcoal);">${esc(b.brand)} ${esc(b.model)}</h1>
+      ${html}
+    </div>`;
+
+  attachGallerySwipe();
+  loadResponseTime(profile.id);
+  loadSellerOtherListings(profile.id, b.id);
+  loadSimilarListings(b.type, b.id);
+}
+
+function showListingView() {
+  const detailView = document.getElementById('detail-view');
+  const mainEl     = document.querySelector('.main');
+  const heroEl     = document.querySelector('.hero');
+  const searchEl   = document.querySelector('.search-section');
+  if (detailView) detailView.style.display = 'none';
+  if (mainEl)     mainEl.style.display     = '';
+  if (heroEl)     heroEl.style.display     = '';
+  if (searchEl)   searchEl.style.display   = '';
+  document.title = 'Cykelbørsen – Køb & Sælg Brugte Cykler i Danmark';
+}
+
+function handleRoute() {
+  const hash = window.location.hash;
+  const bikeMatch = hash.match(/^#\/bike\/([^/]+)$/);
+  if (bikeMatch) {
+    closeAllModals();
+    renderBikePage(bikeMatch[1]);
+  } else {
+    showListingView();
+  }
+}
+
+window.addEventListener('hashchange', handleRoute);
+
+function navigateToBike(bikeId) {
+  window.location.hash = `#/bike/${bikeId}`;
 }
 
 async function loadResponseTime(sellerId) {
@@ -3556,6 +3644,9 @@ window.previewImages      = previewImages;
 window.setPrimary         = setPrimary;
 window.removeImage        = removeImage;
 window.openBikeModal      = openBikeModal;
+window.navigateToBike     = navigateToBike;
+window.renderBikePage     = renderBikePage;
+window.showListingView    = showListingView;
 window.closeBikeModal     = closeBikeModal;
 window.openReportModal    = openReportModal;
 window.closeReportModal   = closeReportModal;
