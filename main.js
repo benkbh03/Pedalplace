@@ -137,12 +137,10 @@ async function init() {
   // _hasHadSession forhindrer at token-refresh (der fyrer SIGNED_IN) kalder loadBikes() unødvendigt
   let _hasHadSession = !!currentUser;
   supabase.auth.onAuthStateChange(async (_event, session) => {
-    console.log(`[IDLE-DEBUG] onAuthStateChange: event=${_event}, hasSession=${!!session}, _hasHadSession=${_hasHadSession}`);
     if (session) {
       const isNewLogin = !_hasHadSession;
       _hasHadSession = true;
       currentUser = session.user;
-      console.log(`[IDLE-DEBUG] onAuthStateChange: currentUser.id=${currentUser.id}, isNewLogin=${isNewLogin}`);
 
       if (_event === 'SIGNED_IN' && !isNewLogin) {
         // Token-refresh pseudo-SIGNED_IN: opdater kun currentUser (har nyt token) — ingen sideeffekter
@@ -219,7 +217,6 @@ async function init() {
       }
       _refreshInProgress = true;
       _lastRefreshTime = now;
-      console.log(`[IDLE-DEBUG] visibilitychange (500ms debounce): triggering session refresh + loadBikes()`);
       try {
         const { data, error } = await supabase.auth.getSession();
         loadBikes();
@@ -359,7 +356,7 @@ function updateNavAvatar(name, avatarUrl) {
   const el = document.getElementById('nav-initials');
   if (!el) return;
   if (avatarUrl) {
-    el.innerHTML = `<img src="${avatarUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    el.innerHTML = `<img src="${avatarUrl}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:50%;display:block;">`;
   } else {
     el.textContent = (name || '?').substring(0, 2).toUpperCase();
   }
@@ -570,7 +567,6 @@ async function openDealerProfile(dealerId) {
   }
 
   if (!dealer) {
-    console.log(`[IDLE-DEBUG] openDealerProfile: setting error HTML`);
     header.innerHTML = retryHTML('Kunne ikke hente forhandler.', `() => openDealerProfile('${dealerId}')`);
     return;
   }
@@ -743,7 +739,6 @@ async function openUserProfile(userId) {
     }
   } catch (err) {
     console.error(`[IDLE-DEBUG] openUserProfile EXCEPTION/TIMEOUT: ${err.message}`);
-    console.log(`[IDLE-DEBUG] openUserProfile: setting error HTML`);
     content.innerHTML = retryHTML('Kunne ikke hente profil.', `() => openUserProfile('${userId}')`);
     return;
   }
@@ -2165,7 +2160,6 @@ async function openBikeModal(bikeId) {
   }
 
   if (error || !b) {
-    console.log(`[IDLE-DEBUG] openBikeModal: bike is null or error occurred, setting error HTML`);
     document.getElementById('bike-modal-body').innerHTML = `
       <div style="text-align:center;padding:40px 20px;">
         <p style="color:var(--rust);margin-bottom:16px;">Kunne ikke hente annonce – tjek din internetforbindelse.</p>
@@ -2316,7 +2310,6 @@ async function openBikeModal(bikeId) {
 
   } catch (renderErr) {
     console.error(`[IDLE-DEBUG] openBikeModal RENDER EXCEPTION: ${renderErr.message}`);
-    console.log(`[IDLE-DEBUG] openBikeModal: setting retry HTML after render error`);
     document.getElementById('bike-modal-body').innerHTML = retryHTML('Kunne ikke vise annonce.', `() => openBikeModal('${bikeId}')`);
   }
 }
