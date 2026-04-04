@@ -7,16 +7,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://ktufgncydxhkhfttojkh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_bxJ_gRDrsJ-XCWWUD6NiQA_1nlPDA2B';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  global: {
-    fetch: (url, options = {}) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25000);
-      return fetch(url, { ...options, signal: controller.signal })
-        .finally(() => clearTimeout(timer));
-    }
-  }
-});
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Global bruger-cache — hentes én gang ved init
 let currentUser    = null;
