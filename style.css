@@ -1650,6 +1650,265 @@ footer p { color: var(--muted); font-size: 0.82rem; }
 .admin-id-img:hover { transform: scale(1.05); }
 
 
+/* ============================================================
+   PROFILSIDE (.pp-*) – Marketplace-kvalitet profil-pages
+   ============================================================ */
+
+.pp-wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+/* Tilbage-knap */
+.pp-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--rust);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+  margin-bottom: 20px;
+  transition: opacity 0.15s;
+}
+.pp-back-btn:hover { opacity: 0.7; }
+
+/* Header */
+.pp-header {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 28px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 0;
+}
+.pp-header-dealer {
+  background: linear-gradient(135deg, var(--cream), #f7f4ec);
+  border: 1.5px solid var(--forest);
+}
+.pp-header-skeleton {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 28px;
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+/* Avatar */
+.pp-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 3px solid var(--border);
+}
+.pp-avatar-dealer {
+  border: 3px solid var(--forest);
+  box-shadow: 0 0 0 3px rgba(42, 61, 46, 0.15);
+}
+
+/* Info */
+.pp-info {
+  flex: 1;
+  min-width: 0;
+}
+.pp-name {
+  font-family: 'Fraunces', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--charcoal);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pp-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.pp-member-since {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.pp-location {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.pp-last-seen {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pp-bio {
+  font-size: 0.88rem;
+  color: var(--charcoal);
+  line-height: 1.55;
+  margin: 10px 0 0;
+  max-width: 540px;
+}
+
+/* Trust bar */
+.pp-trust-bar {
+  display: flex;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: #fff;
+}
+.pp-trust-item {
+  flex: 1;
+  text-align: center;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-right: 1px solid var(--border);
+}
+.pp-trust-item:last-child { border-right: none; }
+.pp-trust-item:hover { background: var(--sand); }
+.pp-trust-val {
+  font-family: 'Fraunces', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--charcoal);
+}
+.pp-trust-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* CTA section (send besked) */
+.pp-cta-section {
+  margin-top: 16px;
+}
+.pp-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--rust);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.pp-cta-btn:hover { background: var(--rust-light); transform: translateY(-1px); }
+
+/* Tabs (re-uses existing up-tab styling) */
+.pp-tabs {
+  margin-bottom: 20px;
+}
+
+/* Section titles */
+.pp-section {
+  margin-bottom: 32px;
+}
+.pp-section-title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--charcoal);
+  margin-bottom: 16px;
+}
+
+/* Bikes grid */
+.pp-bikes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+/* Empty state */
+.pp-empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.pp-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+/* Achievements */
+.pp-achievements {
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   PROFILSIDE – Responsive
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .pp-wrap {
+    padding: 16px 12px 48px;
+  }
+  .pp-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  .pp-header-skeleton {
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  .pp-name {
+    font-size: 1.25rem;
+    justify-content: center;
+  }
+  .pp-badges {
+    justify-content: center;
+  }
+  .pp-bio {
+    max-width: 100%;
+  }
+  .pp-cta-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .pp-trust-item {
+    padding: 12px 8px;
+  }
+  .pp-trust-val {
+    font-size: 1.1rem;
+  }
+  .pp-bikes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+}
+
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
