@@ -1616,6 +1616,8 @@ function closeProfileModal() {
   disableFocusTrap('profile-modal');
 }
 document.getElementById('profile-modal').addEventListener('click', e => {
+  const inEditGrid = document.getElementById('edit-img-existing-grid')?.contains(e.target);
+  if (inEditGrid) console.log(`[CLICK-TRACE] profile-modal handler fired for click INSIDE edit-grid! target=${e.target.tagName} class="${e.target.className}"`);
   if (e.target === e.currentTarget) closeProfileModal();
 });
 
@@ -3256,6 +3258,18 @@ async function openEditModal(id) {
     );
   };
   document.addEventListener('click', window._editModalCaptureHandler, true); // capturing phase
+
+  // [CLICK-TRACE] mousedown capturing — fires before click, can't be swallowed by preventDefault
+  if (window._editModalMousedownHandler) {
+    document.removeEventListener('mousedown', window._editModalMousedownHandler, true);
+  }
+  window._editModalMousedownHandler = function(e) {
+    const modal = document.getElementById('edit-modal');
+    if (!modal || !modal.classList.contains('open')) return;
+    const inGrid = document.getElementById('edit-img-existing-grid')?.contains(e.target);
+    console.log(`[CLICK-TRACE] MOUSEDOWN target.tag=${e.target.tagName} class="${e.target.className}" inGrid=${inGrid} closest-action=${e.target.closest('button[data-action]')?.dataset.action ?? 'NONE'}`);
+  };
+  document.addEventListener('mousedown', window._editModalMousedownHandler, true);
 }
 
 // Enforcer altid præcis 0 eller 1 primært billede på tværs af existing + new
@@ -3322,19 +3336,12 @@ function renderEditExistingImages() {
   grid._editHandler && grid.removeEventListener('click', grid._editHandler);
   grid._editHandler = function(e) {
     const btn = e.target.closest('button[data-action]');
-    console.log(`[IMAGE-RUNTIME] GRID delegated-handler fired`,
-      `target.tag=${e.target.tagName}`, `target.class="${e.target.className}"`,
-      `closest[data-action]=${btn ? btn.dataset.action : 'NONE'}`
-    );
-    console.log(`[IMAGE-FIX] click target after pointer-events fix: tag=${e.target.tagName} class="${e.target.className}" action=${btn?.dataset.action ?? 'NONE'}`);
     if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
     const action = btn.dataset.action;
     const imgId  = btn.dataset.imgId;
     console.log(`[IMAGE-FIX] delegated click action=${action} imgId=${imgId}`);
-    if (action === 'remove-existing')           editRemoveExisting(imgId);
-    else if (action === 'set-existing-primary') editSetExistingPrimary(imgId);
+    if (action === 'remove-existing')        editRemoveExisting(imgId);
+    if (action === 'set-existing-primary')   editSetExistingPrimary(imgId);
   };
   grid.addEventListener('click', grid._editHandler);
   console.log(`[IMAGE-RUNTIME] listener attached to grid (renderId=${_renderId}), grid===document.getElementById check: ${grid === document.getElementById('edit-img-existing-grid')}`);
@@ -3418,6 +3425,10 @@ function closeEditModal() {
   if (window._editModalCaptureHandler) {
     document.removeEventListener('click', window._editModalCaptureHandler, true);
     window._editModalCaptureHandler = null;
+  }
+  if (window._editModalMousedownHandler) {
+    document.removeEventListener('mousedown', window._editModalMousedownHandler, true);
+    window._editModalMousedownHandler = null;
   }
 }
 
@@ -4368,6 +4379,11 @@ function handleSearchKey(e) {
 
 // Luk autocomplete ved klik udenfor
 document.addEventListener('click', function(e) {
+  const editOpen = document.getElementById('edit-modal')?.classList.contains('open');
+  if (editOpen) {
+    const inGrid = document.getElementById('edit-img-existing-grid')?.contains(e.target);
+    console.log(`[CLICK-TRACE] autocomplete-handler fired while edit-modal open: target=${e.target.tagName} class="${e.target.className}" inGrid=${inGrid}`);
+  }
   if (!e.target.closest('#search-input') && !e.target.closest('#autocomplete-list')) {
     var list = document.getElementById('autocomplete-list');
     if (list) list.style.display = 'none';
