@@ -3221,6 +3221,13 @@ async function openEditModal(id) {
   if (warrantyGroup) warrantyGroup.style.display = currentProfile?.seller_type === 'dealer' ? '' : 'none';
   document.getElementById('edit-warranty').value = b.warranty || '';
 
+  // [IMAGE-SAVE] Log hvad DB returnerer ved reload
+  console.log(`[IMAGE-SAVE] openEditModal LOADED bikeId=${id}`,
+    `bike_images=${(b.bike_images||[]).length}`,
+    `ids=[${(b.bike_images||[]).map(i=>i.id).join(',')}]`,
+    `primaries=[${(b.bike_images||[]).filter(i=>i.is_primary).map(i=>i.id).join(',')}]`
+  );
+
   // [IMAGE-RUNTIME] Tjek om grid eksisterer før render
   const gridCheck = document.getElementById('edit-img-existing-grid');
   const dupeIds   = document.querySelectorAll('#edit-img-existing-grid');
@@ -3459,13 +3466,32 @@ async function saveEditedListing() {
 
   // Slet fjernede billeder
   const toDelete = editExistingImgs.filter(img => img.toDelete);
+  const toKeep   = editExistingImgs.filter(img => !img.toDelete);
+  console.log(`[IMAGE-SAVE] START bikeId=${id}`,
+    `existing=${editExistingImgs.length}`,
+    `toDelete=${toDelete.length} ids=[${toDelete.map(i=>i.id).join(',')}]`,
+    `toKeep=${toKeep.length} ids=[${toKeep.map(i=>i.id).join(',')}]`,
+    `primary=${toKeep.filter(i=>i.is_primary).map(i=>i.id)}`,
+    `newFiles=${editNewFiles.length}`
+  );
   for (const img of toDelete) {
-    await supabase.from('bike_images').delete().eq('id', img.id);
+    const { error: delErr } = await supabase.from('bike_images').delete().eq('id', img.id);
+    console.log(`[IMAGE-SAVE] DELETE bike_image id=${img.id} error=${delErr ? JSON.stringify(delErr) : 'null'}`);
+    // Forsøg at slette fra storage (url format: .../bike-images/bikeId/filename)
+    if (!delErr && img.url) {
+      const match = img.url.match(/bike-images\/(.+)$/);
+      if (match) {
+        const storagePath = match[1];
+        const { error: stErr } = await supabase.storage.from('bike-images').remove([storagePath]);
+        console.log(`[IMAGE-SAVE] STORAGE DELETE path=${storagePath} error=${stErr ? JSON.stringify(stErr) : 'null'}`);
+      }
+    }
   }
 
   // Opdater primær-status på eksisterende billeder
-  for (const img of editExistingImgs.filter(img => !img.toDelete)) {
-    await supabase.from('bike_images').update({ is_primary: img.is_primary }).eq('id', img.id);
+  for (const img of toKeep) {
+    const { error: updErr } = await supabase.from('bike_images').update({ is_primary: img.is_primary }).eq('id', img.id);
+    console.log(`[IMAGE-SAVE] UPDATE bike_image id=${img.id} is_primary=${img.is_primary} error=${updErr ? JSON.stringify(updErr) : 'null'}`);
   }
 
   // Upload nye billeder
@@ -3481,6 +3507,7 @@ async function saveEditedListing() {
   editNewFiles     = [];
   editExistingImgs = [];
 
+  console.log(`[IMAGE-SAVE] DONE bikeId=${id} — closing modal`);
   closeEditModal();
   showToast('✅ Annonce opdateret!');
   loadMyListings();
