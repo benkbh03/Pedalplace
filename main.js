@@ -2409,6 +2409,7 @@ async function renderBikePage(bikeId) {
 
   document.title = `${b.brand} ${b.model} – ${b.price.toLocaleString('da-DK')} kr. | Cykelbørsen`;
 
+  console.log(`[POST-SAVE-VIEW] renderBikePage renderer bikeId=${b.id} bike_images=${b.bike_images?.length ?? 'undef'}`);
   const { html, profile } = buildBikeBodyHTML(b);
   const backAction = history.length > 1 ? 'history.back()' : "window.location.hash='#/'";
   detailView.innerHTML = `
@@ -2830,12 +2831,21 @@ function handleRoute() {
   const dealerMatch  = hash.match(/^#\/dealer\/([^/]+)$/);
   if (bikeMatch) {
     closeAllModals();
+    console.log(`[SCROLL-FIX] route=bike scrollY=${window.scrollY} → reset`);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    console.log(`[SCROLL-FIX] after reset scrollY=${window.scrollY}`);
     renderBikePage(bikeMatch[1]);
   } else if (profileMatch) {
     closeAllModals();
+    console.log(`[SCROLL-FIX] route=profile scrollY=${window.scrollY} → reset`);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    console.log(`[SCROLL-FIX] after reset scrollY=${window.scrollY}`);
     renderUserProfilePage(profileMatch[1]);
   } else if (dealerMatch) {
     closeAllModals();
+    console.log(`[SCROLL-FIX] route=dealer scrollY=${window.scrollY} → reset`);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    console.log(`[SCROLL-FIX] after reset scrollY=${window.scrollY}`);
     renderDealerProfilePage(dealerMatch[1]);
   } else {
     showListingView();
@@ -3919,6 +3929,14 @@ async function saveEditedListing() {
   loadMyListings();
   loadBikes();
   updateFilterCounts();
+
+  // Re-render detail-view hvis den aktuelle route viser denne annonce
+  const currentHash = window.location.hash;
+  console.log(`[POST-SAVE-VIEW] currentHash=${currentHash} bikeId=${id} match=${currentHash === '#/bike/' + id}`);
+  if (currentHash === `#/bike/${id}`) {
+    console.log(`[POST-SAVE-VIEW] detail-view aktiv — re-renderer bike ${id} med friske data`);
+    renderBikePage(id);
+  }
 }
 
 
