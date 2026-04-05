@@ -3704,11 +3704,11 @@ function enforceSinglePrimaryImage() {
     });
   } else if (total === 0) {
     // Intet primært — tildel til første synlige billede
-    const first = editExistingImgs.find(img => !img.toDelete);
-    if (first) {
-      first.is_primary = true;
+    const firstExisting = editExistingImgs.find(img => !img.toDelete);
+    if (firstExisting) {
+      editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img === firstExisting }));
     } else if (editNewFiles.length > 0) {
-      editNewFiles[0].isPrimary = true;
+      editNewFiles = editNewFiles.map((f, i) => ({ ...f, isPrimary: i === 0 }));
     }
   }
 }
@@ -3778,9 +3778,12 @@ function editRemoveExisting(imgId) {
   const wasPrimary = target.is_primary;
   editExistingImgs = editExistingImgs.map(img => img.id == imgId ? { ...img, toDelete: true, is_primary: false } : img);
   if (wasPrimary) {
-    const remaining = editExistingImgs.filter(img => !img.toDelete);
-    if (remaining.length > 0)       remaining[0].is_primary = true;
-    else if (editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
+    const firstRemaining = editExistingImgs.find(img => !img.toDelete);
+    if (firstRemaining) {
+      editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img === firstRemaining }));
+    } else if (editNewFiles.length > 0) {
+      editNewFiles = editNewFiles.map((f, i) => ({ ...f, isPrimary: i === 0 }));
+    }
   }
   console.log(`[IMAGE-FIX] remove-existing state after`,
     `visible=${editExistingImgs.filter(i => !i.toDelete).length}`,
@@ -3806,13 +3809,26 @@ function renderEditNewImages() {
   grid.innerHTML = editNewFiles.map((item, i) => `
     <div class="img-preview-item ${item.isPrimary ? 'primary' : ''}">
       <img src="${item.url}" alt="Nyt billede">
-      ${item.isPrimary ? '<span class="primary-badge">Primær</span>' : `<button class="set-primary" onclick="editSetNewPrimary(${i})">★</button>`}
-      <button class="remove-img" onclick="editRemoveNew(${i})">✕</button>
+      ${item.isPrimary
+        ? '<span class="primary-badge">Primær</span>'
+        : `<button type="button" class="set-primary" data-action="set-new-primary" data-index="${i}">★</button>`}
+      <button type="button" class="remove-img" data-action="remove-new" data-index="${i}">✕</button>
     </div>`).join('');
   const label = document.getElementById('edit-upload-label');
   if (label) label.textContent = editNewFiles.length > 0
     ? `${editNewFiles.length} nye billede${editNewFiles.length !== 1 ? 'r' : ''} klar til upload`
     : 'Klik for at tilføje billeder';
+
+  // Event delegation — ingen inline onclick, index læses fra data-attribut ved klik-tid
+  grid._editNewHandler && grid.removeEventListener('click', grid._editNewHandler);
+  grid._editNewHandler = function(e) {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const index = parseInt(btn.dataset.index, 10);
+    if (btn.dataset.action === 'set-new-primary') editSetNewPrimary(index);
+    if (btn.dataset.action === 'remove-new')      editRemoveNew(index);
+  };
+  grid.addEventListener('click', grid._editNewHandler);
 }
 
 function editSetNewPrimary(index) {
