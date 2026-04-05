@@ -3599,10 +3599,9 @@ supabase.auth.onAuthStateChange((_event, session) => {
    REDIGER ANNONCE
    ============================================================ */
 
-// Billede-state for redigér-modal — ét samlet array som source of truth
-// { key, id, file, url, isPrimary, status: 'existing'|'new'|'deleted' }
-let editImages = [];
-let _editTempId = 0;
+// Billede-state for redigér-modal (adskilt fra opret-modal)
+let editNewFiles      = [];  // { file, url, isPrimary }
+let editExistingImgs  = [];  // { id, url, is_primary, toDelete }
 
 async function openEditModal(id) {
   const { data: b, error } = await supabase
@@ -3629,126 +3628,222 @@ async function openEditModal(id) {
   if (warrantyGroup) warrantyGroup.style.display = currentProfile?.seller_type === 'dealer' ? '' : 'none';
   document.getElementById('edit-warranty').value = b.warranty || '';
 
-  editImagesInit(b.bike_images);
-  editImagesRender();
+  // [IMAGE-SAVE] Log hvad DB returnerer ved reload
+  console.log(`[IMAGE-SAVE] openEditModal LOADED bikeId=${id}`,
+    `bike_images=${(b.bike_images||[]).length}`,
+    `ids=[${(b.bike_images||[]).map(i=>i.id).join(',')}]`,
+    `primaries=[${(b.bike_images||[]).filter(i=>i.is_primary).map(i=>i.id).join(',')}]`
+  );
+
+  // [IMAGE-RUNTIME] Tjek om grid eksisterer før render
+  const gridCheck = document.getElementById('edit-img-existing-grid');
+  const dupeIds   = document.querySelectorAll('#edit-img-existing-grid');
+  console.log(`[IMAGE-RUNTIME] openEditModal: grid=${gridCheck ? 'FOUND' : 'MISSING'}`,
+    `duplicateGrids=${dupeIds.length}`,
+    `gridInDOM=${gridCheck ? document.body.contains(gridCheck) : 'n/a'}`
+  );
+
+  // Indlæs eksisterende billeder
+  editNewFiles     = [];
+  editExistingImgs = (b.bike_images || []).map(img => ({ ...img, toDelete: false }));
+  enforceSinglePrimaryImage();
+  renderEditExistingImages();
+  renderEditNewImages();
 
   document.getElementById('edit-modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  // [IMAGE-RUNTIME] Tilføj capturing listener på document for at se ALLE klik under edit-modal
+  if (window._editModalCaptureHandler) {
+    document.removeEventListener('click', window._editModalCaptureHandler, true);
+  }
+  window._editModalCaptureHandler = function(e) {
+    const modal = document.getElementById('edit-modal');
+    if (!modal || !modal.classList.contains('open')) return;
+    const inGrid = document.getElementById('edit-img-existing-grid')?.contains(e.target);
+    const closestBtn = e.target.closest('button[data-action]');
+    console.log(`[IMAGE-RUNTIME] CAPTURE CLICK`,
+      `target.tag=${e.target.tagName}`,
+      `target.class="${e.target.className}"`,
+      `target.id="${e.target.id}"`,
+      `inExistingGrid=${inGrid}`,
+      `closest[data-action]=${closestBtn ? closestBtn.dataset.action : 'NONE'}`,
+      `e.defaultPrevented=${e.defaultPrevented}`
+    );
+  };
+  document.addEventListener('click', window._editModalCaptureHandler, true); // capturing phase
+
+  // [CLICK-TRACE] mousedown capturing — fires before click, can't be swallowed by preventDefault
+  if (window._editModalMousedownHandler) {
+    document.removeEventListener('mousedown', window._editModalMousedownHandler, true);
+  }
+  window._editModalMousedownHandler = function(e) {
+    const modal = document.getElementById('edit-modal');
+    if (!modal || !modal.classList.contains('open')) return;
+    const inGrid = document.getElementById('edit-img-existing-grid')?.contains(e.target);
+    console.log(`[CLICK-TRACE] MOUSEDOWN target.tag=${e.target.tagName} class="${e.target.className}" inGrid=${inGrid} closest-action=${e.target.closest('button[data-action]')?.dataset.action ?? 'NONE'}`);
+  };
+  document.addEventListener('mousedown', window._editModalMousedownHandler, true);
 }
 
-/* ============================================================
-   BILLED-STATE — unified editImages
-   ============================================================ */
-
-function editImagesInit(bikeImages) {
-  _editTempId = 0;
-  editImages  = (bikeImages || []).map(img => ({
-    key:       `existing-${img.id}`,
-    id:        img.id,
-    file:      null,
-    url:       img.url,
-    isPrimary: !!img.is_primary,
-    status:    'existing',
-  }));
-  editImagesEnsurePrimary();
-  console.log(`[IMAGE-STATE] init: ${editImages.length} billeder`, editImages.map(i => ({ key: i.key, isPrimary: i.isPrimary })));
-}
-
-function editImagesEnsurePrimary() {
-  const visible   = editImages.filter(i => i.status !== 'deleted');
-  const primaries = visible.filter(i => i.isPrimary);
-  if (primaries.length === 1) return;
-  // 0 eller >1 primære — nulstil alle, tildel til første synlige
-  editImages = editImages.map(i => ({ ...i, isPrimary: false }));
-  if (visible.length > 0) {
-    const firstKey = visible[0].key;
-    editImages = editImages.map(i => i.key === firstKey ? { ...i, isPrimary: true } : i);
+// Enforcer altid præcis 0 eller 1 primært billede på tværs af existing + new
+function enforceSinglePrimaryImage() {
+  const existingPrimaries = editExistingImgs.filter(img => !img.toDelete && img.is_primary);
+  const newPrimaries      = editNewFiles.filter(f => f.isPrimary);
+  const total = existingPrimaries.length + newPrimaries.length;
+  if (total > 1) {
+    // Behold kun den første primære, nulstil alle andre
+    let keptOne = false;
+    editExistingImgs = editExistingImgs.map(img => {
+      if (!img.toDelete && img.is_primary && !keptOne) { keptOne = true; return img; }
+      return img.is_primary ? { ...img, is_primary: false } : img;
+    });
+    editNewFiles = editNewFiles.map((f, i) => {
+      if (f.isPrimary && !keptOne) { keptOne = true; return f; }
+      return f.isPrimary ? { ...f, isPrimary: false } : f;
+    });
+  } else if (total === 0) {
+    // Intet primært — tildel til første synlige billede
+    const first = editExistingImgs.find(img => !img.toDelete);
+    if (first) {
+      first.is_primary = true;
+    } else if (editNewFiles.length > 0) {
+      editNewFiles[0].isPrimary = true;
+    }
   }
 }
 
-function editImagesRender() {
-  const existingGrid = document.getElementById('edit-img-existing-grid');
-  const newGrid      = document.getElementById('edit-img-new-grid');
-  if (!existingGrid || !newGrid) return;
+function renderEditExistingImages() {
+  const grid = document.getElementById('edit-img-existing-grid');
+  if (!grid) return;
+  const visible = editExistingImgs.filter(img => !img.toDelete);
 
-  const visibleExisting = editImages.filter(i => i.status === 'existing');
-  const visibleNew      = editImages.filter(i => i.status === 'new');
+  // [IMAGE-RUNTIME] snapshot af grid-node identitet FØR innerHTML-skift
+  const nodeBeforeRender = grid;
+  const _renderId = ++renderEditExistingImages._renderId;
 
-  const cardHTML = img => `
-    <div class="img-preview-item ${img.isPrimary ? 'primary' : ''}">
+  // Render knapper med data-attributter — ingen inline onclick
+  grid.innerHTML = visible.map(img => `
+    <div class="img-preview-item ${img.is_primary ? 'primary' : ''}">
       <img src="${img.url}" alt="Billede">
-      ${img.isPrimary
+      ${img.is_primary
         ? '<span class="primary-badge">Primær</span>'
-        : `<button type="button" class="set-primary" data-action="set-primary" data-key="${img.key}">★</button>`}
-      <button type="button" class="remove-img" data-action="remove" data-key="${img.key}">✕</button>
-    </div>`;
+        : `<button type="button" class="set-primary" data-action="set-existing-primary" data-img-id="${img.id}">★</button>`}
+      <button type="button" class="remove-img" data-action="remove-existing" data-img-id="${img.id}">✕</button>
+    </div>`).join('') || '';
 
-  existingGrid.innerHTML = visibleExisting.map(cardHTML).join('') || '';
-  newGrid.innerHTML      = visibleNew.map(cardHTML).join('') || '';
+  // [IMAGE-RUNTIME] Verificér grid-node er SAMME reference efter innerHTML-skift
+  const gridAfter = document.getElementById('edit-img-existing-grid');
+  const sameNode  = gridAfter === nodeBeforeRender;
+  const removeBtns  = grid.querySelectorAll('button[data-action="remove-existing"]');
+  const primaryBtns = grid.querySelectorAll('button[data-action="set-existing-primary"]');
+  console.log(`[IMAGE-RUNTIME] renderEditExistingImages #${_renderId}`,
+    `sameNodeAfterRender=${sameNode}`,
+    `visible=${visible.length}`,
+    `removeBtns=${removeBtns.length}`, `primaryBtns=${primaryBtns.length}`
+  );
+  removeBtns.forEach((btn, i) => {
+    console.log(`[IMAGE-RUNTIME]  remove-btn[${i}] outerHTML="${btn.outerHTML}" inGrid=${grid.contains(btn)}`);
+  });
 
-  const label = document.getElementById('edit-upload-label');
-  if (label) label.textContent = visibleNew.length > 0
-    ? `${visibleNew.length} nye billede${visibleNew.length !== 1 ? 'r' : ''} klar`
-    : 'Klik for at tilføje billeder';
-
-  // Event delegation — én fælles handler på begge grids
-  const handler = function(e) {
+  // Event delegation — én listener, udskiftet ved hver render
+  grid._editHandler && grid.removeEventListener('click', grid._editHandler);
+  grid._editHandler = function(e) {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
-    const { action, key } = btn.dataset;
-    if (action === 'remove')      editImagesRemove(key);
-    if (action === 'set-primary') editImagesSetPrimary(key);
+    const action = btn.dataset.action;
+    const imgId  = btn.dataset.imgId;
+    console.log(`[IMAGE-FIX] delegated click action=${action} imgId=${imgId}`);
+    if (action === 'remove-existing')        editRemoveExisting(imgId);
+    if (action === 'set-existing-primary')   editSetExistingPrimary(imgId);
   };
-  existingGrid._editHandler && existingGrid.removeEventListener('click', existingGrid._editHandler);
-  existingGrid._editHandler = handler;
-  existingGrid.addEventListener('click', handler);
+  grid.addEventListener('click', grid._editHandler);
+  console.log(`[IMAGE-RUNTIME] listener attached to grid (renderId=${_renderId}), grid===document.getElementById check: ${grid === document.getElementById('edit-img-existing-grid')}`);
+}
+renderEditExistingImages._renderId = 0;
 
-  newGrid._editHandler && newGrid.removeEventListener('click', newGrid._editHandler);
-  newGrid._editHandler = handler;
-  newGrid.addEventListener('click', handler);
+function editSetExistingPrimary(imgId) {
+  const target = editExistingImgs.find(img => img.id == imgId);
+  if (!target) return;
+  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: img.id == imgId }));
+  editNewFiles     = editNewFiles.map(f => ({ ...f, isPrimary: false }));
+  console.log(`[IMAGE-FIX] set-existing-primary state after`, editExistingImgs.map(i => ({ id: i.id, is_primary: i.is_primary })));
+  renderEditExistingImages();
+  renderEditNewImages();
 }
 
-function editImagesRemove(key) {
-  const target = editImages.find(i => i.key === key);
-  if (!target || target.status === 'deleted') return;
-  const wasPrimary = target.isPrimary;
-  if (target.status === 'new') URL.revokeObjectURL(target.url);
-  editImages = editImages.map(i => i.key === key ? { ...i, status: 'deleted', isPrimary: false } : i);
-  if (wasPrimary) editImagesEnsurePrimary();
-  console.log(`[IMAGE-STATE] remove key=${key} wasPrimary=${wasPrimary} remaining=${editImages.filter(i => i.status !== 'deleted').length}`);
-  editImagesRender();
-}
-
-function editImagesSetPrimary(key) {
-  if (!editImages.find(i => i.key === key && i.status !== 'deleted')) return;
-  editImages = editImages.map(i => ({ ...i, isPrimary: i.key === key && i.status !== 'deleted' }));
-  console.log(`[IMAGE-STATE] set-primary key=${key}`);
-  editImagesRender();
+function editRemoveExisting(imgId) {
+  const target = editExistingImgs.find(img => img.id == imgId);
+  if (!target) return;
+  const wasPrimary = target.is_primary;
+  editExistingImgs = editExistingImgs.map(img => img.id == imgId ? { ...img, toDelete: true, is_primary: false } : img);
+  if (wasPrimary) {
+    const remaining = editExistingImgs.filter(img => !img.toDelete);
+    if (remaining.length > 0)       remaining[0].is_primary = true;
+    else if (editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
+  }
+  console.log(`[IMAGE-FIX] remove-existing state after`,
+    `visible=${editExistingImgs.filter(i => !i.toDelete).length}`,
+    editExistingImgs.map(i => ({ id: i.id, toDelete: i.toDelete, is_primary: i.is_primary }))
+  );
+  renderEditExistingImages();
+  renderEditNewImages();
 }
 
 function editPreviewImages(input) {
-  const files        = Array.from(input.files);
-  const visibleCount = editImages.filter(i => i.status !== 'deleted').length;
-  const remaining    = 8 - visibleCount;
-  const hasPrimary   = editImages.some(i => i.status !== 'deleted' && i.isPrimary);
+  const files = Array.from(input.files);
+  const remaining = 8 - editExistingImgs.filter(img => !img.toDelete).length - editNewFiles.length;
   files.filter(validateImageFile).slice(0, remaining).forEach((file, i) => {
-    const key = `new-${++_editTempId}`;
-    editImages.push({ key, id: null, file, url: URL.createObjectURL(file), isPrimary: !hasPrimary && i === 0, status: 'new' });
+    const hasPrimary = editExistingImgs.some(img => !img.toDelete && img.is_primary) || editNewFiles.some(f => f.isPrimary);
+    editNewFiles.push({ file, url: URL.createObjectURL(file), isPrimary: !hasPrimary && i === 0 });
   });
-  console.log(`[IMAGE-STATE] add ${Math.min(files.length, remaining)} billeder, total synlige=${editImages.filter(i => i.status !== 'deleted').length}`);
-  editImagesRender();
+  renderEditNewImages();
 }
 
-function editImagesClear() {
-  editImages.filter(i => i.status === 'new').forEach(i => URL.revokeObjectURL(i.url));
-  editImages  = [];
-  _editTempId = 0;
+function renderEditNewImages() {
+  const grid = document.getElementById('edit-img-new-grid');
+  if (!grid) return;
+  grid.innerHTML = editNewFiles.map((item, i) => `
+    <div class="img-preview-item ${item.isPrimary ? 'primary' : ''}">
+      <img src="${item.url}" alt="Nyt billede">
+      ${item.isPrimary ? '<span class="primary-badge">Primær</span>' : `<button class="set-primary" onclick="editSetNewPrimary(${i})">★</button>`}
+      <button class="remove-img" onclick="editRemoveNew(${i})">✕</button>
+    </div>`).join('');
+  const label = document.getElementById('edit-upload-label');
+  if (label) label.textContent = editNewFiles.length > 0
+    ? `${editNewFiles.length} nye billede${editNewFiles.length !== 1 ? 'r' : ''} klar til upload`
+    : 'Klik for at tilføje billeder';
+}
+
+function editSetNewPrimary(index) {
+  editExistingImgs = editExistingImgs.map(img => ({ ...img, is_primary: false }));
+  editNewFiles     = editNewFiles.map((f, i) => ({ ...f, isPrimary: i === index }));
+  renderEditExistingImages();
+  renderEditNewImages();
+}
+
+function editRemoveNew(index) {
+  URL.revokeObjectURL(editNewFiles[index].url);
+  const wasPrimary = editNewFiles[index].isPrimary;
+  editNewFiles.splice(index, 1);
+  if (wasPrimary && editNewFiles.length > 0) editNewFiles[0].isPrimary = true;
+  renderEditNewImages();
 }
 
 function closeEditModal() {
-  editImagesClear();
+  editNewFiles.forEach(f => URL.revokeObjectURL(f.url));
+  editNewFiles     = [];
+  editExistingImgs = [];
   document.getElementById('edit-modal').classList.remove('open');
   document.body.style.overflow = '';
+  if (window._editModalCaptureHandler) {
+    document.removeEventListener('click', window._editModalCaptureHandler, true);
+    window._editModalCaptureHandler = null;
+  }
+  if (window._editModalMousedownHandler) {
+    document.removeEventListener('mousedown', window._editModalMousedownHandler, true);
+    window._editModalMousedownHandler = null;
+  }
 }
 
 async function saveEditedListing() {
@@ -3776,50 +3871,70 @@ async function saveEditedListing() {
   const { error } = await supabase.from('bikes').update(updates).eq('id', id);
   if (error) { showToast('❌ Kunne ikke gemme ændringer'); console.error(error); return; }
 
-  // Billede-handlinger ud fra unified editImages state
-  const imgToDelete = editImages.filter(i => i.status === 'deleted' && i.id !== null);
-  const imgToUpdate = editImages.filter(i => i.status === 'existing');
-  const imgToUpload = editImages.filter(i => i.status === 'new');
-  console.log(`[IMAGE-STATE] save bikeId=${id} delete=${imgToDelete.length} update=${imgToUpdate.length} upload=${imgToUpload.length}`);
-
-  // A: Slet markerede eksisterende billeder
-  for (const img of imgToDelete) {
+  // Slet fjernede billeder
+  const toDelete = editExistingImgs.filter(img => img.toDelete);
+  const toKeep   = editExistingImgs.filter(img => !img.toDelete);
+  console.log(`[IMAGE-SAVE] START bikeId=${id}`,
+    `existing=${editExistingImgs.length}`,
+    `toDelete=${toDelete.length} ids=[${toDelete.map(i=>i.id).join(',')}]`,
+    `toKeep=${toKeep.length} ids=[${toKeep.map(i=>i.id).join(',')}]`,
+    `primary=${toKeep.filter(i=>i.is_primary).map(i=>i.id)}`,
+    `newFiles=${editNewFiles.length}`
+  );
+  for (const img of toDelete) {
     const { error: delErr } = await supabase.from('bike_images').delete().eq('id', img.id);
+    console.log(`[IMAGE-SAVE] DELETE bike_image id=${img.id} error=${delErr ? JSON.stringify(delErr) : 'null'}`);
+    // Forsøg at slette fra storage (url format: .../bike-images/bikeId/filename)
     if (!delErr && img.url) {
       const match = img.url.match(/bike-images\/(.+)$/);
-      if (match) await supabase.storage.from('bike-images').remove([match[1]]);
+      if (match) {
+        const storagePath = match[1];
+        const { error: stErr } = await supabase.storage.from('bike-images').remove([storagePath]);
+        console.log(`[IMAGE-SAVE] STORAGE DELETE path=${storagePath} error=${stErr ? JSON.stringify(stErr) : 'null'}`);
+      }
     }
   }
 
-  // B: Opdatér is_primary for eksisterende billeder
-  for (const img of imgToUpdate) {
-    await supabase.from('bike_images').update({ is_primary: img.isPrimary }).eq('id', img.id);
+  // Opdater primær-status på eksisterende billeder
+  for (const img of toKeep) {
+    const { error: updErr } = await supabase.from('bike_images').update({ is_primary: img.is_primary }).eq('id', img.id);
+    console.log(`[IMAGE-SAVE] UPDATE bike_image id=${img.id} is_primary=${img.is_primary} error=${updErr ? JSON.stringify(updErr) : 'null'}`);
   }
 
-  // C: Upload og opret nye billeder
-  for (const item of imgToUpload) {
+  // Upload nye billeder
+  for (const item of editNewFiles) {
     const ext      = item.file.name.split('.').pop();
     const filename = `${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const { error: uploadErr } = await supabase.storage.from('bike-images').upload(filename, item.file, { contentType: item.file.type });
-    if (uploadErr) { console.error('[IMAGE-STATE] upload fejl:', uploadErr); continue; }
+    if (uploadErr) { console.error('Upload fejl:', uploadErr); continue; }
     const { data: { publicUrl } } = supabase.storage.from('bike-images').getPublicUrl(filename);
     await supabase.from('bike_images').insert({ bike_id: id, url: publicUrl, is_primary: item.isPrimary });
   }
+  editNewFiles.forEach(f => URL.revokeObjectURL(f.url));
+  editNewFiles     = [];
+  editExistingImgs = [];
 
-  // Ryd state og invalider cache
-  editImagesClear();
-  bikeCache.delete(id);
-  bikeCache.delete(Number(id));
-  console.log(`[IMAGE-STATE] save done, cache invalidated bikeId=${id}`);
+  // Invalider bikeCache så næste åbning af annonce/modal henter friske data
+  if (bikeCache.has(id) || bikeCache.has(Number(id))) {
+    bikeCache.delete(id);
+    bikeCache.delete(Number(id));
+    console.log(`[CACHE-FIX] bikeCache invalidated for bikeId=${id}`);
+  } else {
+    console.log(`[CACHE-FIX] bikeCache had no entry for bikeId=${id} (keys: [${[...bikeCache.keys()].join(',')}])`);
+  }
 
+  console.log(`[IMAGE-SAVE] DONE bikeId=${id} — closing modal`);
   closeEditModal();
   showToast('✅ Annonce opdateret!');
   loadMyListings();
   loadBikes();
   updateFilterCounts();
 
-  // Re-render detail-view hvis den redigerede annonce er åben
-  if (window.location.hash === `#/bike/${id}`) {
+  // Re-render detail-view hvis den aktuelle route viser denne annonce
+  const currentHash = window.location.hash;
+  console.log(`[POST-SAVE-VIEW] currentHash=${currentHash} bikeId=${id} match=${currentHash === '#/bike/' + id}`);
+  if (currentHash === `#/bike/${id}`) {
+    console.log(`[POST-SAVE-VIEW] detail-view aktiv — re-renderer bike ${id} med friske data`);
     renderBikePage(id);
   }
 }
@@ -4129,7 +4244,11 @@ window.handleResetPassword = handleResetPassword;
 window.openEditModal          = openEditModal;
 window.closeEditModal         = closeEditModal;
 window.saveEditedListing      = saveEditedListing;
-window.editPreviewImages = editPreviewImages;
+window.editPreviewImages      = editPreviewImages;
+window.editSetExistingPrimary = editSetExistingPrimary;
+window.editRemoveExisting     = editRemoveExisting;
+window.editSetNewPrimary      = editSetNewPrimary;
+window.editRemoveNew          = editRemoveNew;
 window.previewImages      = previewImages;
 window.setPrimary         = setPrimary;
 window.removeImage        = removeImage;
