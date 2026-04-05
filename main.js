@@ -2147,8 +2147,10 @@ function showSection(section) {
 
 async function fetchBikeById(bikeId) {
   if (bikeCache.has(bikeId)) {
+    console.log(`[CACHE-FIX] fetchBikeById HIT cache bikeId=${bikeId}`);
     return { data: bikeCache.get(bikeId), error: null };
   }
+  console.log(`[CACHE-FIX] fetchBikeById MISS — fetching from DB bikeId=${bikeId}`);
   const fetchPromise = supabase
     .from('bikes')
     .select('*, profiles(id, name, seller_type, shop_name, phone, city, verified, id_verified), bike_images(url, is_primary)')
@@ -3506,6 +3508,15 @@ async function saveEditedListing() {
   editNewFiles.forEach(f => URL.revokeObjectURL(f.url));
   editNewFiles     = [];
   editExistingImgs = [];
+
+  // Invalider bikeCache så næste åbning af annonce/modal henter friske data
+  if (bikeCache.has(id) || bikeCache.has(Number(id))) {
+    bikeCache.delete(id);
+    bikeCache.delete(Number(id));
+    console.log(`[CACHE-FIX] bikeCache invalidated for bikeId=${id}`);
+  } else {
+    console.log(`[CACHE-FIX] bikeCache had no entry for bikeId=${id} (keys: [${[...bikeCache.keys()].join(',')}])`);
+  }
 
   console.log(`[IMAGE-SAVE] DONE bikeId=${id} — closing modal`);
   closeEditModal();
